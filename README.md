@@ -2,6 +2,8 @@
 
 A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.themoviedb.org/)) and save them to a personal **watch-later** list. Built to be mobile-first, edge-deployable, and free to host.
 
+**▶️ Live demo: [watchlater.moviesils.workers.dev](https://watchlater.moviesils.workers.dev)**
+
 ---
 
 ## ✨ Features
