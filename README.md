@@ -29,7 +29,7 @@ A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.
 
 ## 📦 Prerequisites
 
-- **Node.js** ≥ 20 (LTS recommended)
+- **Node.js** ≥ 22 (LTS recommended)
 - A free **TMDB** account for the API token
 - (For deployment) free **Turso** and **Cloudflare** accounts
 
