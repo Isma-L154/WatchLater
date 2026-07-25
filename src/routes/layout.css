@@ -1,1 +1,31 @@
 @import 'tailwindcss';
+
+:root {
+	color-scheme: dark;
+}
+
+body {
+	@apply text-slate-100 antialiased;
+	font-family:
+		system-ui,
+		-apple-system,
+		'Segoe UI',
+		Roboto,
+		Helvetica,
+		Arial,
+		sans-serif;
+	min-height: 100dvh;
+	/* Cinematic dark base with soft colored glows in the corners. */
+	background-color: #020617;
+	background-image:
+		radial-gradient(55rem 55rem at 50% -15%, rgba(56, 189, 248, 0.13), transparent 60%),
+		radial-gradient(40rem 40rem at 100% 0%, rgba(129, 140, 248, 0.1), transparent 55%),
+		radial-gradient(45rem 45rem at 0% 20%, rgba(236, 72, 153, 0.06), transparent 55%);
+	background-attachment: fixed;
+}
+
+/* Subtle custom scrollbar to match the dark theme. */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: #334155 transparent;
+}

@@ -8,3 +8,6 @@ bun.lockb
 # Miscellaneous
 /static/
 /drizzle/
+
+# Generated Cloudflare Worker types (keep wrangler's canonical format)
+worker-configuration.d.ts

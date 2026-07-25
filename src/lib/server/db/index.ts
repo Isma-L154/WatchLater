@@ -1,11 +1,34 @@
-import { drizzle } from 'drizzle-orm/libsql';
+import { drizzle, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
 import * as schema from './schema';
 import { env } from '$env/dynamic/private';
 
-if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
-if (!env.DATABASE_AUTH_TOKEN) throw new Error('DATABASE_AUTH_TOKEN is not set');
+/**
+ * The Drizzle client is created lazily on first use rather than at module load.
+ *
+ * On Cloudflare Workers, environment variables (via `$env/dynamic/private`) are
+ * only populated inside a request context. Reading them at module top level
+ * would return `undefined` during the worker's initial evaluation and crash
+ * every route, so initialization is deferred until the first query in a request.
+ */
+let database: LibSQLDatabase<typeof schema> | undefined;
 
-const client = createClient({ url: env.DATABASE_URL, authToken: env.DATABASE_AUTH_TOKEN });
+export function getDb(): LibSQLDatabase<typeof schema> {
+	if (database) return database;
 
-export const db = drizzle(client, { schema });
+	if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+
+	// A remote libSQL/Turso database requires an auth token, while a local SQLite
+	// file used during development does not.
+	const isRemote = env.DATABASE_URL.startsWith('libsql://');
+	if (isRemote && !env.DATABASE_AUTH_TOKEN) {
+		throw new Error('DATABASE_AUTH_TOKEN is required for remote libSQL databases');
+	}
+
+	const client = createClient({
+		url: env.DATABASE_URL,
+		authToken: env.DATABASE_AUTH_TOKEN || undefined
+	});
+	database = drizzle(client, { schema });
+	return database;
+}
