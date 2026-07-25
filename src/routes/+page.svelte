@@ -25,6 +25,7 @@
 	// --- Watchlist filter state (kept as strings to pair with SegmentedControl) ---
 	let statusTab = $state('all');
 	let typeFilter = $state('all');
+	let sortBy = $state('recent');
 
 	// --- Detail modal state ---
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
@@ -59,6 +60,17 @@
 			return matchesStatus && matchesType;
 		})
 	);
+
+	// Apply the chosen sort. 'recent' keeps the DB order (addedAt desc).
+	const sortedItems = $derived.by(() => {
+		const items = [...filteredItems];
+		if (sortBy === 'rating') {
+			items.sort((a, b) => (b.voteAverage ?? -1) - (a.voteAverage ?? -1));
+		} else if (sortBy === 'title') {
+			items.sort((a, b) => a.title.localeCompare(b.title));
+		}
+		return items;
+	});
 
 	const hasQuery = $derived(query.trim().length > 0);
 
@@ -295,6 +307,17 @@
 							{ value: 'tv', label: 'TV' }
 						]}
 					/>
+					<label class="relative">
+						<span class="sr-only">Sort watchlist</span>
+						<select
+							bind:value={sortBy}
+							class="cursor-pointer rounded-xl bg-slate-800/70 py-1.5 pl-3 pr-8 text-xs font-semibold text-slate-300 ring-1 ring-white/5 focus:outline-none focus:ring-2 focus:ring-sky-500/40 sm:text-sm"
+						>
+							<option value="recent">Recently added</option>
+							<option value="rating">Top rated</option>
+							<option value="title">A–Z</option>
+						</select>
+					</label>
 				</div>
 			{/if}
 		</div>
@@ -313,7 +336,7 @@
 			</div>
 		{:else}
 			<div class={gridClass}>
-				{#each filteredItems as item (item.id)}
+				{#each sortedItems as item (item.id)}
 					<div
 						animate:flip={{ duration: 250 }}
 						in:fade={{ duration: 200 }}
