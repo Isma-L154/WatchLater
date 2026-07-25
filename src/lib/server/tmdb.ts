@@ -80,3 +80,20 @@ export async function searchMulti(query: string): Promise<MediaResult[]> {
 		)
 		.map((raw) => normalize(raw, raw.media_type));
 }
+
+/**
+ * Fetch this week's trending movies and TV shows. Used to populate the home
+ * screen with content before the user has searched for anything.
+ */
+export async function getTrending(): Promise<MediaResult[]> {
+	const data = await tmdbFetch<TmdbPaginatedResponse>('/trending/all/week', {
+		language: 'en-US'
+	});
+
+	return data.results
+		.filter(
+			(raw): raw is TmdbRawResult & { media_type: MediaType } =>
+				raw.media_type === 'movie' || raw.media_type === 'tv'
+		)
+		.map((raw) => normalize(raw, raw.media_type));
+}

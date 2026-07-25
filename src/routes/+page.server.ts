@@ -2,13 +2,25 @@ import { fail } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
 import { db } from '$lib/server/db';
 import { watchlistItem } from '$lib/server/db/schema';
-import type { MediaType } from '$lib/types';
+import { getTrending } from '$lib/server/tmdb';
+import type { MediaResult, MediaType } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
-/** Load the full watch-later list, newest additions first. */
+/**
+ * Load the watch-later list (newest first) plus this week's trending titles.
+ * Trending failures are non-fatal — the page still works without them.
+ */
 export const load: PageServerLoad = async () => {
 	const items = await db.select().from(watchlistItem).orderBy(desc(watchlistItem.addedAt));
-	return { items };
+
+	let trending: MediaResult[] = [];
+	try {
+		trending = await getTrending();
+	} catch (err) {
+		console.error('Failed to load trending titles:', err);
+	}
+
+	return { items, trending };
 };
 
 export const actions: Actions = {
