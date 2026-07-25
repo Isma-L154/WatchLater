@@ -18,14 +18,14 @@ A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.
 
 ## 🧱 Tech Stack
 
-| Layer      | Choice                                                                       |
-| ---------- | ---------------------------------------------------------------------------- |
-| Framework  | [SvelteKit](https://svelte.dev/) (Svelte 5) + TypeScript                      |
-| Styling    | [Tailwind CSS v4](https://tailwindcss.com/)                                  |
+| Layer      | Choice                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| Framework  | [SvelteKit](https://svelte.dev/) (Svelte 5) + TypeScript                                    |
+| Styling    | [Tailwind CSS v4](https://tailwindcss.com/)                                                 |
 | Database   | [Turso](https://turso.tech/) (libSQL / SQLite) via [Drizzle ORM](https://orm.drizzle.team/) |
-| Backend    | SvelteKit server routes (TMDB proxy + form actions)                          |
-| Hosting    | [Cloudflare](https://developers.cloudflare.com/workers/) (`@sveltejs/adapter-cloudflare`) |
-| Build tool | [Vite](https://vite.dev/)                                                    |
+| Backend    | SvelteKit server routes (TMDB proxy + form actions)                                         |
+| Hosting    | [Cloudflare](https://developers.cloudflare.com/workers/) (`@sveltejs/adapter-cloudflare`)   |
+| Build tool | [Vite](https://vite.dev/)                                                                   |
 
 ## 📦 Prerequisites
 
@@ -55,7 +55,7 @@ The app runs at **http://localhost:5173**.
 ### Environment variables
 
 | Variable              | Description                                                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `TMDB_ACCESS_TOKEN`   | TMDB **v4 "API Read Access Token"** (Bearer). Get it at [TMDB → Settings → API](https://www.themoviedb.org/settings/api). |
 | `DATABASE_URL`        | `file:local.db` for local dev, or your `libsql://…turso.io` URL in production.                                            |
 | `DATABASE_AUTH_TOKEN` | Turso auth token (leave empty for the local file DB).                                                                     |
@@ -72,9 +72,18 @@ The app runs at **http://localhost:5173**.
 | `npm run check`       | Type-check the project (svelte-check).            |
 | `npm run lint`        | Prettier + ESLint checks.                         |
 | `npm run format`      | Auto-format with Prettier.                        |
+| `npm run test:unit`   | Run Vitest unit tests.                            |
+| `npm run test:e2e`    | Run Playwright end-to-end tests.                  |
+| `npm test`            | Run unit tests once, then e2e.                    |
 | `npm run db:generate` | Generate a new Drizzle migration from the schema. |
 | `npm run db:migrate`  | Apply pending migrations to the database.         |
 | `npm run db:studio`   | Open Drizzle Studio to inspect the DB.            |
+
+## 🧪 Testing & CI
+
+- **Unit tests (Vitest):** cover the pure logic — image URL helpers and the watchlist filtering/sorting/search (`src/lib/*.spec.ts`). Run with `npm run test:unit`.
+- **E2E (Playwright):** smoke tests that drive the running app (`e2e/*.e2e.ts`). They run against the dev server and therefore need a local `.env`, so they are a manual/local step (not part of CI). Run with `npm run test:e2e`.
+- **CI (GitHub Actions):** `.github/workflows/ci.yml` runs Prettier, ESLint, `svelte-check` and the unit tests on every push and pull request to `main` / `dev`.
 
 ## 🗂️ Project Structure
 

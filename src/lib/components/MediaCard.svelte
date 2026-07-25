@@ -34,7 +34,7 @@
 </script>
 
 <article
-	class="group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900/60 shadow-lg shadow-black/20 ring-1 ring-white/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40 hover:ring-sky-400/30"
+	class="group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900/60 shadow-lg ring-1 shadow-black/20 ring-white/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40 hover:ring-sky-400/30"
 >
 	<div class="relative aspect-[2/3] w-full overflow-hidden bg-slate-800">
 		{#if poster}
@@ -59,14 +59,14 @@
 		></div>
 
 		<span
-			class="absolute left-2 top-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sky-300 backdrop-blur"
+			class="absolute top-2 left-2 rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold tracking-wider text-sky-300 uppercase backdrop-blur"
 		>
 			{mediaType === 'tv' ? 'TV' : 'Movie'}
 		</span>
 
 		{#if rating}
 			<span
-				class="absolute right-2 top-2 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-amber-300 backdrop-blur"
+				class="absolute top-2 right-2 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-amber-300 backdrop-blur"
 			>
 				★ {rating}
 			</span>
@@ -99,13 +99,13 @@
 			<button
 				type="button"
 				onclick={onSelect}
-				title={title}
-				class="line-clamp-2 text-left text-sm font-semibold leading-snug text-slate-100 transition hover:text-sky-300"
+				{title}
+				class="line-clamp-2 text-left text-sm leading-snug font-semibold text-slate-100 transition hover:text-sky-300"
 			>
 				{title}
 			</button>
 		{:else}
-			<h3 class="line-clamp-2 text-sm font-semibold leading-snug text-slate-100" title={title}>
+			<h3 class="line-clamp-2 text-sm leading-snug font-semibold text-slate-100" {title}>
 				{title}
 			</h3>
 		{/if}

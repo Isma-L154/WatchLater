@@ -26,3 +26,5 @@ vite.config.ts.timestamp-*
 
 # Claude Code (personal, machine-specific settings)
 .claude/settings.local.json
+# Playwright
+test-results

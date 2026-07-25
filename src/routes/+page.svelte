@@ -7,6 +7,7 @@
 	import MediaDetailModal from '$lib/components/MediaDetailModal.svelte';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { applyWatchlistView, countByStatus } from '$lib/watchlist';
 	import type { MediaResult, MediaType } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -45,40 +46,17 @@
 		selected ? (savedIds.get(key(selected.tmdbId, selected.mediaType)) ?? null) : null
 	);
 
-	const counts = $derived({
-		all: data.items.length,
-		toWatch: data.items.filter((i) => !i.watched).length,
-		watched: data.items.filter((i) => i.watched).length
-	});
+	const counts = $derived(countByStatus(data.items));
 
-	const filteredItems = $derived(
-		data.items.filter((item) => {
-			const matchesStatus =
-				statusTab === 'all' ||
-				(statusTab === 'toWatch' && !item.watched) ||
-				(statusTab === 'watched' && item.watched);
-			const matchesType = typeFilter === 'all' || item.mediaType === typeFilter;
-			return matchesStatus && matchesType;
+	// Status/type/search filtering plus sorting, all in one pure helper.
+	const visibleItems = $derived(
+		applyWatchlistView(data.items, {
+			status: statusTab,
+			type: typeFilter,
+			sort: sortBy,
+			query: listQuery
 		})
 	);
-
-	// Apply the chosen sort. 'recent' keeps the DB order (addedAt desc).
-	const sortedItems = $derived.by(() => {
-		const items = [...filteredItems];
-		if (sortBy === 'rating') {
-			items.sort((a, b) => (b.voteAverage ?? -1) - (a.voteAverage ?? -1));
-		} else if (sortBy === 'title') {
-			items.sort((a, b) => a.title.localeCompare(b.title));
-		}
-		return items;
-	});
-
-	// Finally, filter by the in-list search query (matches the title).
-	const visibleItems = $derived.by(() => {
-		const q = listQuery.trim().toLowerCase();
-		if (!q) return sortedItems;
-		return sortedItems.filter((item) => item.title.toLowerCase().includes(q));
-	});
 
 	const hasQuery = $derived(query.trim().length > 0);
 
@@ -187,7 +165,7 @@
 <!-- Loading placeholders shown while a search is in flight. -->
 {#snippet skeletonGrid()}
 	<div class={gridClass}>
-		{#each Array.from({ length: 10 }) as _, i (i)}
+		{#each [...Array(10).keys()] as i (i)}
 			<div class="animate-pulse overflow-hidden rounded-2xl bg-slate-800/50 ring-1 ring-white/5">
 				<div class="aspect-[2/3] w-full bg-slate-700/40"></div>
 				<div class="space-y-2 p-3">
@@ -201,12 +179,11 @@
 
 <div class="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-20 sm:px-6">
 	<!-- Hero -->
-	<header class="pb-4 pt-8 sm:pt-12">
+	<header class="pt-8 pb-4 sm:pt-12">
 		<div class="flex items-center gap-2">
 			<span class="text-3xl">🎬</span>
 			<h1 class="text-2xl font-black tracking-tight sm:text-4xl">
-				Watch<span
-					class="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent"
+				Watch<span class="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent"
 					>Later</span
 				>
 			</h1>
@@ -222,7 +199,7 @@
 	>
 		<label class="relative block">
 			<span class="sr-only">Search movies and TV shows</span>
-			<span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+			<span class="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-slate-500">
 				{#if searching}
 					<span
 						class="block h-4 w-4 animate-spin rounded-full border-2 border-slate-600 border-t-sky-400"
@@ -237,14 +214,14 @@
 				oninput={onInput}
 				placeholder="Search for a movie or TV show…"
 				autocomplete="off"
-				class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-3 pl-11 pr-11 text-base text-slate-100 shadow-inner placeholder:text-slate-500 focus:border-sky-500 focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30"
+				class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-3 pr-11 pl-11 text-base text-slate-100 shadow-inner placeholder:text-slate-500 focus:border-sky-500 focus:bg-slate-800 focus:ring-2 focus:ring-sky-500/30 focus:outline-none"
 			/>
 			{#if hasQuery}
 				<button
 					type="button"
 					onclick={clearSearch}
 					aria-label="Clear search"
-					class="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-slate-200"
+					class="absolute top-1/2 right-3 -translate-y-1/2 rounded-full p-1 text-slate-500 transition hover:bg-white/10 hover:text-slate-200"
 				>
 					✕
 				</button>
@@ -258,7 +235,7 @@
 			<p class="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{searchError}</p>
 		{:else if hasQuery}
 			<div class="mb-3 flex items-baseline justify-between">
-				<h2 class="text-sm font-semibold uppercase tracking-wide text-slate-400">Search results</h2>
+				<h2 class="text-sm font-semibold tracking-wide text-slate-400 uppercase">Search results</h2>
 				{#if !searching && results.length > 0}
 					<span class="text-xs text-slate-500">{results.length} found</span>
 				{/if}
@@ -279,7 +256,7 @@
 				</div>
 			{/if}
 		{:else if data.trending.length > 0}
-			<h2 class="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-400">
+			<h2 class="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">
 				🔥 Trending this week
 			</h2>
 			<div class={gridClass}>
@@ -306,7 +283,7 @@
 							bind:value={listQuery}
 							placeholder="Filter your list…"
 							autocomplete="off"
-							class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-1.5 pl-3 pr-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 sm:w-44 sm:text-sm"
+							class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-1.5 pr-3 pl-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 focus:outline-none sm:w-44 sm:text-sm"
 						/>
 					</label>
 					<SegmentedControl
@@ -329,7 +306,7 @@
 						<span class="sr-only">Sort watchlist</span>
 						<select
 							bind:value={sortBy}
-							class="cursor-pointer rounded-xl bg-slate-800/70 py-1.5 pl-3 pr-8 text-xs font-semibold text-slate-300 ring-1 ring-white/5 focus:outline-none focus:ring-2 focus:ring-sky-500/40 sm:text-sm"
+							class="cursor-pointer rounded-xl bg-slate-800/70 py-1.5 pr-8 pl-3 text-xs font-semibold text-slate-300 ring-1 ring-white/5 focus:ring-2 focus:ring-sky-500/40 focus:outline-none sm:text-sm"
 						>
 							<option value="recent">Recently added</option>
 							<option value="rating">Top rated</option>
