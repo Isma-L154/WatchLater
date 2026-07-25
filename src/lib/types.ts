@@ -19,3 +19,30 @@ export interface MediaResult {
 	overview: string | null;
 	voteAverage: number | null;
 }
+
+/** A single cast member, as shown in the detail view. */
+export interface CastMember {
+	name: string;
+	character: string;
+	profilePath: string | null;
+}
+
+/** Rich details for a single title, backing the detail modal. */
+export interface MediaDetails {
+	tmdbId: number;
+	mediaType: MediaType;
+	title: string;
+	overview: string | null;
+	tagline: string | null;
+	genres: string[];
+	releaseDate: string | null;
+	runtimeMinutes: number | null;
+	/** TV only: number of seasons. */
+	seasons: number | null;
+	voteAverage: number | null;
+	backdropPath: string | null;
+	posterPath: string | null;
+	cast: CastMember[];
+	/** YouTube video key for the trailer, if one exists. */
+	trailerKey: string | null;
+}

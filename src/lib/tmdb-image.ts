@@ -12,7 +12,28 @@ export function posterUrl(path: string | null, size: PosterSize = 'w342'): strin
 	return path ? `${TMDB_IMAGE_BASE_URL}/${size}${path}` : null;
 }
 
+/** Build a wide backdrop URL (used as the detail modal header image). */
+export function backdropUrl(
+	path: string | null,
+	size: 'w780' | 'w1280' = 'w1280'
+): string | null {
+	return path ? `${TMDB_IMAGE_BASE_URL}/${size}${path}` : null;
+}
+
+/** Build a cast member profile photo URL. */
+export function profileUrl(path: string | null): string | null {
+	return path ? `${TMDB_IMAGE_BASE_URL}/w185${path}` : null;
+}
+
 /** Extract the 4-digit year from a TMDB date string ("2024-05-01" -> "2024"). */
 export function releaseYear(date: string | null): string {
 	return date ? date.slice(0, 4) : '';
+}
+
+/** Format a runtime in minutes as "1h 58m" (or "45m" when under an hour). */
+export function formatRuntime(minutes: number | null): string {
+	if (!minutes || minutes <= 0) return '';
+	const hours = Math.floor(minutes / 60);
+	const mins = minutes % 60;
+	return hours ? `${hours}h ${mins}m` : `${mins}m`;
 }

@@ -4,9 +4,10 @@
 	import { flip } from 'svelte/animate';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import MediaCard from '$lib/components/MediaCard.svelte';
+	import MediaDetailModal from '$lib/components/MediaDetailModal.svelte';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import type { MediaResult } from '$lib/types';
+	import type { MediaResult, MediaType } from '$lib/types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -25,8 +26,22 @@
 	let statusTab = $state('all');
 	let typeFilter = $state('all');
 
+	// --- Detail modal state ---
+	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
+
+	function openDetails(item: { tmdbId: number; mediaType: MediaType }) {
+		selected = { tmdbId: item.tmdbId, mediaType: item.mediaType };
+	}
+
 	// --- Derived values ---
 	const savedKeys = $derived(new Set(data.items.map((i) => key(i.tmdbId, i.mediaType))));
+
+	// Map of "<tmdbId>:<mediaType>" -> DB id, so the modal knows the saved row id.
+	const savedIds = $derived(new Map(data.items.map((i) => [key(i.tmdbId, i.mediaType), i.id])));
+
+	const selectedSavedId = $derived(
+		selected ? (savedIds.get(key(selected.tmdbId, selected.mediaType)) ?? null) : null
+	);
 
 	const counts = $derived({
 		all: data.items.length,
@@ -119,6 +134,7 @@
 		releaseDate={item.releaseDate}
 		voteAverage={item.voteAverage}
 		mediaType={item.mediaType}
+		onSelect={() => openDetails(item)}
 	>
 		{#snippet actions()}
 			{#if savedKeys.has(key(item.tmdbId, item.mediaType))}
@@ -310,6 +326,7 @@
 							voteAverage={item.voteAverage}
 							mediaType={item.mediaType}
 							watched={item.watched}
+							onSelect={() => openDetails(item)}
 						>
 							{#snippet actions()}
 								<div class="flex gap-2">
@@ -356,3 +373,12 @@
 		{/if}
 	</section>
 </div>
+
+{#if selected}
+	<MediaDetailModal
+		tmdbId={selected.tmdbId}
+		mediaType={selected.mediaType}
+		savedId={selectedSavedId}
+		onClose={() => (selected = null)}
+	/>
+{/if}

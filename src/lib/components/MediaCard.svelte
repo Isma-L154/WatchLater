@@ -11,6 +11,8 @@
 		mediaType: MediaType;
 		/** Visually mark the card as already watched. */
 		watched?: boolean;
+		/** When provided, the poster and title become clickable to open details. */
+		onSelect?: () => void;
 		/** Action controls rendered in the card footer (buttons, forms, badges). */
 		actions?: Snippet;
 	}
@@ -22,6 +24,7 @@
 		voteAverage,
 		mediaType,
 		watched = false,
+		onSelect,
 		actions
 	}: Props = $props();
 
@@ -78,12 +81,34 @@
 				</span>
 			</span>
 		{/if}
+
+		<!-- Transparent overlay button opens the detail view (kept last so it sits
+		     on top of the badges/overlay). -->
+		{#if onSelect}
+			<button
+				type="button"
+				onclick={onSelect}
+				aria-label={`View details for ${title}`}
+				class="absolute inset-0 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+			></button>
+		{/if}
 	</div>
 
 	<div class="flex flex-1 flex-col gap-1.5 p-3">
-		<h3 class="line-clamp-2 text-sm font-semibold leading-snug text-slate-100" title={title}>
-			{title}
-		</h3>
+		{#if onSelect}
+			<button
+				type="button"
+				onclick={onSelect}
+				title={title}
+				class="line-clamp-2 text-left text-sm font-semibold leading-snug text-slate-100 transition hover:text-sky-300"
+			>
+				{title}
+			</button>
+		{:else}
+			<h3 class="line-clamp-2 text-sm font-semibold leading-snug text-slate-100" title={title}>
+				{title}
+			</h3>
+		{/if}
 		{#if year}<p class="text-xs text-slate-500">{year}</p>{/if}
 		{#if actions}<div class="mt-auto pt-1.5">{@render actions()}</div>{/if}
 	</div>

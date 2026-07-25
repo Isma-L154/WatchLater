@@ -1,5 +1,5 @@
 import { env } from '$env/dynamic/private';
-import type { MediaResult, MediaType } from '$lib/types';
+import type { MediaDetails, MediaResult, MediaType } from '$lib/types';
 
 /**
  * Server-only TMDB client. This module lives under `$lib/server`, so SvelteKit
@@ -79,6 +79,68 @@ export async function searchMulti(query: string): Promise<MediaResult[]> {
 				raw.media_type === 'movie' || raw.media_type === 'tv'
 		)
 		.map((raw) => normalize(raw, raw.media_type));
+}
+
+/** Extra fields returned by the single-title details endpoint. */
+interface TmdbGenre {
+	name: string;
+}
+interface TmdbCastRaw {
+	name: string;
+	character?: string;
+	profile_path?: string | null;
+}
+interface TmdbVideoRaw {
+	site: string;
+	type: string;
+	key: string;
+}
+interface TmdbDetailsRaw extends TmdbRawResult {
+	genres?: TmdbGenre[];
+	runtime?: number;
+	episode_run_time?: number[];
+	tagline?: string;
+	number_of_seasons?: number;
+	backdrop_path?: string | null;
+	credits?: { cast?: TmdbCastRaw[] };
+	videos?: { results?: TmdbVideoRaw[] };
+}
+
+/**
+ * Fetch rich details for a single movie/TV title, including credits (cast) and
+ * videos (trailer) in one request via `append_to_response`.
+ */
+export async function getDetails(mediaType: MediaType, id: number): Promise<MediaDetails> {
+	const raw = await tmdbFetch<TmdbDetailsRaw>(`/${mediaType}/${id}`, {
+		language: 'en-US',
+		append_to_response: 'credits,videos'
+	});
+
+	const videos = raw.videos?.results ?? [];
+	const trailer =
+		videos.find((v) => v.site === 'YouTube' && v.type === 'Trailer') ??
+		videos.find((v) => v.site === 'YouTube');
+
+	return {
+		tmdbId: raw.id,
+		mediaType,
+		title: raw.title ?? raw.name ?? 'Untitled',
+		overview: raw.overview ?? null,
+		tagline: raw.tagline?.trim() || null,
+		genres: (raw.genres ?? []).map((genre) => genre.name),
+		releaseDate: raw.release_date ?? raw.first_air_date ?? null,
+		runtimeMinutes: raw.runtime ?? raw.episode_run_time?.[0] ?? null,
+		seasons: raw.number_of_seasons ?? null,
+		voteAverage: raw.vote_average ?? null,
+		backdropPath: raw.backdrop_path ?? null,
+		posterPath: raw.poster_path ?? null,
+		cast: (raw.credits?.cast ?? []).slice(0, 12).map((member) => ({
+			name: member.name,
+			character: member.character ?? '',
+			profilePath: member.profile_path ?? null
+		})),
+		trailerKey: trailer?.key ?? null
+	};
 }
 
 /**
