@@ -26,6 +26,7 @@
 	let statusTab = $state('all');
 	let typeFilter = $state('all');
 	let sortBy = $state('recent');
+	let listQuery = $state('');
 
 	// --- Detail modal state ---
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
@@ -70,6 +71,13 @@
 			items.sort((a, b) => a.title.localeCompare(b.title));
 		}
 		return items;
+	});
+
+	// Finally, filter by the in-list search query (matches the title).
+	const visibleItems = $derived.by(() => {
+		const q = listQuery.trim().toLowerCase();
+		if (!q) return sortedItems;
+		return sortedItems.filter((item) => item.title.toLowerCase().includes(q));
 	});
 
 	const hasQuery = $derived(query.trim().length > 0);
@@ -291,6 +299,16 @@
 			<h2 class="text-lg font-bold text-slate-100">Your Watchlist</h2>
 			{#if counts.all > 0}
 				<div class="flex flex-wrap items-center gap-2">
+					<label class="relative">
+						<span class="sr-only">Filter your watchlist</span>
+						<input
+							type="search"
+							bind:value={listQuery}
+							placeholder="Filter your list…"
+							autocomplete="off"
+							class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-1.5 pl-3 pr-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/30 sm:w-44 sm:text-sm"
+						/>
+					</label>
 					<SegmentedControl
 						bind:value={statusTab}
 						options={[
@@ -330,13 +348,17 @@
 					Search or pick something trending above to get started.
 				</p>
 			</div>
-		{:else if filteredItems.length === 0}
+		{:else if visibleItems.length === 0}
 			<div class="rounded-2xl border border-dashed border-white/10 px-6 py-12 text-center">
-				<p class="text-slate-400">Nothing here with the current filters.</p>
+				{#if listQuery.trim()}
+					<p class="text-slate-400">No matches for “{listQuery}” in your list.</p>
+				{:else}
+					<p class="text-slate-400">Nothing here with the current filters.</p>
+				{/if}
 			</div>
 		{:else}
 			<div class={gridClass}>
-				{#each sortedItems as item (item.id)}
+				{#each visibleItems as item (item.id)}
 					<div
 						animate:flip={{ duration: 250 }}
 						in:fade={{ duration: 200 }}
