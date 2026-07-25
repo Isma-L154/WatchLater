@@ -1,0 +1,21 @@
+/**
+ * Shared, client-safe types. These contain no secrets and can be imported by
+ * both server and browser code (unlike anything under `$lib/server`).
+ */
+
+export type MediaType = 'movie' | 'tv';
+
+/**
+ * A normalized, media-type-agnostic representation of a movie or TV show.
+ * This is the shape our own API returns, decoupling the UI from TMDB's raw
+ * response format (which differs between movies and TV shows).
+ */
+export interface MediaResult {
+	tmdbId: number;
+	mediaType: MediaType;
+	title: string;
+	posterPath: string | null;
+	releaseDate: string | null;
+	overview: string | null;
+	voteAverage: number | null;
+}
