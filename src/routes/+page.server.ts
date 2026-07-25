@@ -1,6 +1,6 @@
 import { fail } from '@sveltejs/kit';
 import { desc, eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
+import { getDb } from '$lib/server/db';
 import { watchlistItem } from '$lib/server/db/schema';
 import { getTrending } from '$lib/server/tmdb';
 import type { MediaResult, MediaType } from '$lib/types';
@@ -11,7 +11,7 @@ import type { Actions, PageServerLoad } from './$types';
  * Trending failures are non-fatal — the page still works without them.
  */
 export const load: PageServerLoad = async () => {
-	const items = await db.select().from(watchlistItem).orderBy(desc(watchlistItem.addedAt));
+	const items = await getDb().select().from(watchlistItem).orderBy(desc(watchlistItem.addedAt));
 
 	let trending: MediaResult[] = [];
 	try {
@@ -36,7 +36,7 @@ export const actions: Actions = {
 		}
 
 		const rating = form.get('voteAverage');
-		await db
+		await getDb()
 			.insert(watchlistItem)
 			.values({
 				tmdbId,
@@ -58,7 +58,7 @@ export const actions: Actions = {
 		const id = String(form.get('id') ?? '');
 		if (!id) return fail(400, { message: 'Missing id.' });
 
-		await db.delete(watchlistItem).where(eq(watchlistItem.id, id));
+		await getDb().delete(watchlistItem).where(eq(watchlistItem.id, id));
 		return { removed: true };
 	},
 
@@ -69,7 +69,7 @@ export const actions: Actions = {
 		const currentlyWatched = form.get('watched') === 'true';
 		if (!id) return fail(400, { message: 'Missing id.' });
 
-		await db
+		await getDb()
 			.update(watchlistItem)
 			.set({ watched: !currentlyWatched })
 			.where(eq(watchlistItem.id, id));
