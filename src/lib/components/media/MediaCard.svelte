@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { posterUrl, releaseYear } from '$lib/tmdb-image';
+	import { getReleaseInfo } from '$lib/domain/release';
 	import type { MediaType } from '$lib/types';
 
 	interface Props {
@@ -31,10 +32,16 @@
 	const poster = $derived(posterUrl(posterPath, 'w342'));
 	const year = $derived(releaseYear(releaseDate));
 	const rating = $derived(voteAverage ? voteAverage.toFixed(1) : null);
+
+	// TMDB returns titles that are still in production alongside released ones,
+	// so the card has to be able to say "not out yet — here's when".
+	const release = $derived(getReleaseInfo(releaseDate));
+	const unreleased = $derived(release.state !== 'released');
 </script>
 
 <article
-	class="group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900/60 shadow-lg ring-1 shadow-black/20 ring-white/5 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40 hover:ring-sky-400/30"
+	class="group relative flex flex-col overflow-hidden rounded-2xl bg-slate-900/60 shadow-lg ring-1 shadow-black/20 transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40 hover:ring-sky-400/30
+		{unreleased ? 'ring-amber-300/20' : 'ring-white/5'}"
 >
 	<div class="relative aspect-[2/3] w-full overflow-hidden bg-slate-800">
 		{#if poster}
@@ -69,6 +76,23 @@
 				class="absolute top-2 right-2 flex items-center gap-0.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[11px] font-bold text-amber-300 backdrop-blur"
 			>
 				★ {rating}
+			</span>
+		{/if}
+
+		<!-- Release marker: a soft amber pulse reads as "pending" at a glance,
+		     without competing with the poster art. -->
+		{#if unreleased}
+			<span
+				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-slate-950/75 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber-200 ring-1 ring-amber-300/25 backdrop-blur ring-inset"
+			>
+				<span class="sr-only">Not released yet —</span>
+				<span class="relative flex h-1.5 w-1.5">
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70"
+					></span>
+					<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-300"></span>
+				</span>
+				{release.shortLabel}
 			</span>
 		{/if}
 
@@ -109,7 +133,13 @@
 				{title}
 			</h3>
 		{/if}
-		{#if year}<p class="text-xs text-slate-500">{year}</p>{/if}
+		<!-- The poster badge carries the date; this line carries the meaning, so
+		     an amber "Dec 16" can never be mistaken for an ordinary release year. -->
+		{#if unreleased}
+			<p class="text-xs font-medium text-amber-300/80">Not released yet</p>
+		{:else if year}
+			<p class="text-xs text-slate-500">{year}</p>
+		{/if}
 		{#if actions}<div class="mt-auto pt-1.5">{@render actions()}</div>{/if}
 	</div>
 </article>

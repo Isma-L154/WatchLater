@@ -3,18 +3,22 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
+	import { getReleaseInfo, releaseVerb } from '$lib/domain/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import type { MediaDetails, MediaType } from '$lib/types';
+	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
+	import type { MediaDetails, MediaType, SavedEntry } from '$lib/types';
 
 	interface Props {
 		tmdbId: number;
 		mediaType: MediaType;
-		/** DB id when the title is already saved, otherwise null. */
-		savedId: string | null;
+		/** The saved row when this title is already on the list, otherwise null. */
+		saved: SavedEntry | null;
+		/** Saving requires an account; signed-out visitors get a sign-in prompt. */
+		signedIn: boolean;
 		onClose: () => void;
 	}
 
-	let { tmdbId, mediaType, savedId, onClose }: Props = $props();
+	let { tmdbId, mediaType, saved, signedIn, onClose }: Props = $props();
 
 	let details = $state<MediaDetails | null>(null);
 	let loading = $state(true);
@@ -80,6 +84,23 @@
 		const runtime = formatRuntime(details.runtimeMinutes);
 		if (runtime) parts.push(runtime);
 		return parts.join(' · ');
+	});
+
+	const release = $derived(details ? getReleaseInfo(details.releaseDate) : null);
+
+	/**
+	 * Countdown wording for the release banner. Kept separate from the date so
+	 * the banner reads as "when" followed by "how soon".
+	 */
+	const countdown = $derived.by(() => {
+		const days = release?.daysUntil;
+		if (!days) return '';
+		if (days === 1) return 'tomorrow';
+		if (days < 30) return `in ${days} days`;
+		const months = Math.round(days / 30);
+		if (months < 12) return `in about ${months} month${months > 1 ? 's' : ''}`;
+		const years = Math.round(days / 365);
+		return `in about ${years} year${years > 1 ? 's' : ''}`;
 	});
 </script>
 
@@ -181,6 +202,44 @@
 					</div>
 				</div>
 
+				<!-- Unreleased banner. TMDB indexes titles long before they come out,
+				     so this states plainly that the title isn't watchable yet. -->
+				{#if release && release.state !== 'released'}
+					<div
+						class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3.5 py-3"
+					>
+						<span class="relative mt-1.5 flex h-2 w-2 flex-shrink-0">
+							<span
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70"
+							></span>
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-amber-300"></span>
+						</span>
+						<div class="min-w-0">
+							<p class="text-[11px] font-bold tracking-widest text-amber-300 uppercase">
+								Not out yet
+							</p>
+							{#if release.state === 'upcoming'}
+								<p class="mt-0.5 text-sm text-slate-200">
+									{releaseVerb(details.mediaType)}
+									{release.fullDate}
+								</p>
+								<p class="mt-0.5 text-xs text-amber-200/70">
+									{countdown}{details.productionStatus
+										? ` · ${details.productionStatus.toLowerCase()}`
+										: ''}
+								</p>
+							{:else}
+								<p class="mt-0.5 text-sm text-slate-200">No release date announced yet.</p>
+								{#if details.productionStatus}
+									<p class="mt-0.5 text-xs text-amber-200/70">
+										Currently {details.productionStatus.toLowerCase()}
+									</p>
+								{/if}
+							{/if}
+						</div>
+					</div>
+				{/if}
+
 				{#if details.genres.length}
 					<div class="mt-4 flex flex-wrap gap-2">
 						{#each details.genres as genre (genre)}
@@ -203,13 +262,15 @@
 
 				<!-- Save / remove -->
 				<div class="mt-5">
-					{#if savedId}
+					{#if !signedIn}
+						<GoogleButton size="full" label="Sign in to save this" />
+					{:else if saved}
 						<form
 							method="POST"
 							action="?/remove"
 							use:enhance={withToast(`Removed “${details.title}”`, 'info')}
 						>
-							<input type="hidden" name="id" value={savedId} />
+							<input type="hidden" name="id" value={saved.id} />
 							<button
 								type="submit"
 								class="w-full rounded-xl bg-red-500/15 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/25"
@@ -235,6 +296,53 @@
 						</form>
 					{/if}
 				</div>
+
+				<!-- Season progress. Pills come straight from TMDB's live season count,
+				     so an entry saved before tracking existed can start here; the server
+				     still resolves the authoritative total when it writes. -->
+				{#if saved && details.mediaType === 'tv' && details.seasons && details.seasons > 1}
+					{@const seen = saved.watched ? details.seasons : saved.seasonsSeen}
+					<div class="mt-6">
+						<div class="flex items-baseline justify-between gap-3">
+							<h3 class="text-sm font-semibold tracking-wide text-slate-400 uppercase">
+								Season progress
+							</h3>
+							<span class="text-xs text-slate-500">
+								{seen === 0
+									? 'Not started'
+									: seen >= details.seasons
+										? `All ${details.seasons} seasons`
+										: `Season ${seen} of ${details.seasons}`}
+							</span>
+						</div>
+
+						<form
+							method="POST"
+							action="?/setSeasons"
+							use:enhance={withToast('Progress saved')}
+							class="mt-3 flex flex-wrap gap-1.5"
+						>
+							<input type="hidden" name="id" value={saved.id} />
+							<!-- Tapping the season you are already on steps back, so the row
+							     doubles as its own undo. -->
+							{#each { length: details.seasons }, index (index)}
+								{@const season = index + 1}
+								<button
+									type="submit"
+									name="seasons"
+									value={season === seen ? season - 1 : season}
+									aria-label={`Mark seasons 1 to ${season} as watched`}
+									class="h-8 min-w-8 rounded-lg px-2 text-xs font-bold tabular-nums transition active:scale-95
+										{season <= seen
+										? 'bg-sky-500 text-white hover:bg-sky-400'
+										: 'bg-white/5 text-slate-400 ring-1 ring-white/10 ring-inset hover:bg-white/10 hover:text-slate-200'}"
+								>
+									{season}
+								</button>
+							{/each}
+						</form>
+					</div>
+				{/if}
 
 				<!-- Cast -->
 				{#if details.cast.length}

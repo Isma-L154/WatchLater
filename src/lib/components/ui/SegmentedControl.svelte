@@ -13,12 +13,16 @@
 	let { options, value = $bindable() }: Props = $props();
 </script>
 
-<div class="inline-flex rounded-xl bg-slate-800/70 p-1 ring-1 ring-white/5">
+<!-- `max-w-full` + horizontal scroll keeps a long set of options on one line on
+     narrow screens instead of letting labels wrap mid-word. -->
+<div
+	class="inline-flex max-w-full overflow-x-auto rounded-xl bg-slate-800/70 p-1 ring-1 ring-white/5"
+>
 	{#each options as option (option.value)}
 		<button
 			type="button"
 			onclick={() => (value = option.value)}
-			class="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition sm:text-sm
+			class="flex flex-shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition sm:text-sm
 				{value === option.value
 				? 'bg-sky-500 text-white shadow-sm'
 				: 'text-slate-400 hover:text-slate-200'}"
