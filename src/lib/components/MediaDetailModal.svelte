@@ -6,19 +6,19 @@
 	import { getReleaseInfo, releaseVerb } from '$lib/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import GoogleButton from '$lib/components/GoogleButton.svelte';
-	import type { MediaDetails, MediaType } from '$lib/types';
+	import type { MediaDetails, MediaType, SavedEntry } from '$lib/types';
 
 	interface Props {
 		tmdbId: number;
 		mediaType: MediaType;
-		/** DB id when the title is already saved, otherwise null. */
-		savedId: string | null;
+		/** The saved row when this title is already on the list, otherwise null. */
+		saved: SavedEntry | null;
 		/** Saving requires an account; signed-out visitors get a sign-in prompt. */
 		signedIn: boolean;
 		onClose: () => void;
 	}
 
-	let { tmdbId, mediaType, savedId, signedIn, onClose }: Props = $props();
+	let { tmdbId, mediaType, saved, signedIn, onClose }: Props = $props();
 
 	let details = $state<MediaDetails | null>(null);
 	let loading = $state(true);
@@ -264,13 +264,13 @@
 				<div class="mt-5">
 					{#if !signedIn}
 						<GoogleButton size="full" label="Sign in to save this" />
-					{:else if savedId}
+					{:else if saved}
 						<form
 							method="POST"
 							action="?/remove"
 							use:enhance={withToast(`Removed “${details.title}”`, 'info')}
 						>
-							<input type="hidden" name="id" value={savedId} />
+							<input type="hidden" name="id" value={saved.id} />
 							<button
 								type="submit"
 								class="w-full rounded-xl bg-red-500/15 py-2.5 text-sm font-semibold text-red-400 transition hover:bg-red-500/25"
@@ -296,6 +296,53 @@
 						</form>
 					{/if}
 				</div>
+
+				<!-- Season progress. Pills come straight from TMDB's live season count,
+				     so an entry saved before tracking existed can start here; the server
+				     still resolves the authoritative total when it writes. -->
+				{#if saved && details.mediaType === 'tv' && details.seasons && details.seasons > 1}
+					{@const seen = saved.watched ? details.seasons : saved.seasonsSeen}
+					<div class="mt-6">
+						<div class="flex items-baseline justify-between gap-3">
+							<h3 class="text-sm font-semibold tracking-wide text-slate-400 uppercase">
+								Season progress
+							</h3>
+							<span class="text-xs text-slate-500">
+								{seen === 0
+									? 'Not started'
+									: seen >= details.seasons
+										? `All ${details.seasons} seasons`
+										: `Season ${seen} of ${details.seasons}`}
+							</span>
+						</div>
+
+						<form
+							method="POST"
+							action="?/setSeasons"
+							use:enhance={withToast('Progress saved')}
+							class="mt-3 flex flex-wrap gap-1.5"
+						>
+							<input type="hidden" name="id" value={saved.id} />
+							<!-- Tapping the season you are already on steps back, so the row
+							     doubles as its own undo. -->
+							{#each { length: details.seasons }, index (index)}
+								{@const season = index + 1}
+								<button
+									type="submit"
+									name="seasons"
+									value={season === seen ? season - 1 : season}
+									aria-label={`Mark seasons 1 to ${season} as watched`}
+									class="h-8 min-w-8 rounded-lg px-2 text-xs font-bold tabular-nums transition active:scale-95
+										{season <= seen
+										? 'bg-sky-500 text-white hover:bg-sky-400'
+										: 'bg-white/5 text-slate-400 ring-1 ring-white/10 ring-inset hover:bg-white/10 hover:text-slate-200'}"
+								>
+									{season}
+								</button>
+							{/each}
+						</form>
+					</div>
+				{/if}
 
 				<!-- Cast -->
 				{#if details.cast.length}

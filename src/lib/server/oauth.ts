@@ -85,11 +85,28 @@ export async function fetchGoogleProfile(accessToken: string): Promise<GooglePro
 	if (!raw.sub) throw new Error('Google userinfo response is missing "sub"');
 
 	return {
-		sub: raw.sub,
-		email: raw.email ?? '',
+		sub: raw.sub.slice(0, 128),
+		email: (raw.email ?? '').slice(0, 320),
 		// Fall back through the available name fields so the account chip is never
 		// blank, even for profiles with unusual privacy settings.
-		name: raw.name || raw.given_name || raw.email?.split('@')[0] || 'Anonymous',
-		picture: raw.picture ?? null
+		name: (raw.name || raw.given_name || raw.email?.split('@')[0] || 'Anonymous').slice(0, 120),
+		picture: safeAvatarUrl(raw.picture)
 	};
+}
+
+/**
+ * Accept an avatar URL only if it is plain `https`.
+ *
+ * This value is stored and later rendered as an `<img src>`. Restricting the
+ * scheme means a malformed or hostile response can never turn that attribute
+ * into something other than an image fetch over TLS.
+ */
+function safeAvatarUrl(value: string | undefined): string | null {
+	if (!value) return null;
+	try {
+		const url = new URL(value);
+		return url.protocol === 'https:' ? url.toString().slice(0, 500) : null;
+	} catch {
+		return null;
+	}
 }

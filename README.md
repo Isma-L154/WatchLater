@@ -12,8 +12,9 @@ A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.
 - 🔍 **Live search** of movies and TV shows (debounced, powered by TMDB multi-search).
 - 🔥 **Trending this week** on the home screen (server-rendered, instant).
 - 🗂️ **Watchlist management** — add, remove, and mark titles as watched.
+- 📺 **Season progress for TV** — track multi-season shows season by season; finishing the last one marks the show as watched automatically ([design notes](docs/season-progress.md)).
 - ⏳ **Unreleased titles are called out** — TMDB indexes films long before they open, so anything not out yet carries an amber countdown badge and an "Upcoming" filter.
-- 🎛️ **Tabs, filters & sorting** — All / To Watch / Upcoming / Watched, Movie / TV filter, and sort options.
+- 🎛️ **Tabs, filters & sorting** — All / To Watch / Watching / Upcoming / Watched, Movie / TV filter, and sort options.
 - 🎞️ **Detail view** — a modal with backdrop, embedded YouTube trailer, genres, synopsis, and cast.
 - 🔔 **Toasts, skeletons, and smooth animations** for a polished feel.
 - 🔒 **Secure by design** — the TMDB token and OAuth secret never reach the browser; all TMDB calls are proxied server-side.
@@ -111,25 +112,32 @@ are stored — the access token is used once, during the callback, and discarded
 
 ```
 src/
-├─ hooks.server.ts       # Resolves the session cookie into `locals.user`
+├─ hooks.server.ts       # Session resolution + baseline security headers
 ├─ lib/
-│  ├─ components/        # Reusable UI (MediaCard, MediaDetailModal, Toaster, …)
-│  ├─ server/
-│  │  ├─ db/             # Drizzle client + schema (server-only)
+│  ├─ components/        # Presentational units — each owns one piece of the page
+│  ├─ server/            # Never reaches the browser (SvelteKit enforces this)
+│  │  ├─ db/             # Drizzle client + schema
 │  │  ├─ auth.ts         # Session create/validate/revoke + cookie helpers
 │  │  ├─ oauth.ts        # Google OAuth client — client secret stays here
 │  │  └─ tmdb.ts         # TMDB proxy (search, trending, details) — token stays here
-│  ├─ stores/            # Svelte 5 rune stores (toasts)
+│  ├─ stores/            # Svelte 5 rune stores (search, toasts)
+│  ├─ progress.ts        # Season tracking: state, clamping, watched invariant
 │  ├─ release.ts         # Release-date reasoning (released / upcoming / TBA)
+│  ├─ watchlist.ts       # List filtering, sorting and status counts
 │  ├─ tmdb-image.ts      # Client-safe image URL helpers
 │  └─ types.ts           # Shared, client-safe types
 └─ routes/
    ├─ +layout.server.ts  # Exposes the signed-in user to every page
-   ├─ +page.svelte       # Home: search, trending, watchlist
-   ├─ +page.server.ts    # Load watchlist + trending; add/remove/toggle actions
+   ├─ +page.svelte       # Home — composition only; behaviour lives in $lib
+   ├─ +page.server.ts    # Loads the list; add/remove/toggle/setSeasons actions
    ├─ auth/              # /auth/google, /auth/google/callback, /auth/logout
    └─ api/               # /api/search, /api/details/[type]/[id]
 ```
+
+The rule of thumb: **decision logic lives in `$lib` as pure functions with unit
+tests** (`progress.ts`, `release.ts`, `watchlist.ts`), components render it, and
+routes only wire the two together. That is why the test suite needs no DOM and
+no database.
 
 ## ☁️ Deployment
 
@@ -176,6 +184,9 @@ Remember to add the production callback URL
 - Sign-in uses OAuth 2.0 with **PKCE** plus a `state` parameter, both carried in short-lived `httpOnly` cookies.
 - The session cookie holds a 256-bit random token; the database stores only its **SHA-256 hash**, so a database dump cannot be replayed as a valid session.
 - Every watchlist read _and_ write is scoped by the session's user id — item ids travel through the browser, so knowing someone else's id is not enough to touch their list.
+- Season targets and totals are resolved server-side; the client can only say how far it got, never redefine the bounds it is measured against.
+- All form input is length- and range-checked before it reaches the database, and each account has a ceiling on how many titles it can store.
+- Responses carry `frame-ancestors 'none'`, `nosniff` and a strict referrer policy. Anything user-specific is `private, no-store`; only the public TMDB proxies opt in to edge caching — which also caps how fast the shared API quota can be burned.
 
 ## 📄 License
 

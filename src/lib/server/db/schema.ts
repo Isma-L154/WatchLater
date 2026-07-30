@@ -82,6 +82,18 @@ export const watchlistItem = sqliteTable(
 
 		// User state.
 		watched: integer('watched', { mode: 'boolean' }).notNull().default(false),
+
+		/**
+		 * TV progress, tracked by season rather than by episode.
+		 *
+		 * A single counter is enough because series are watched in order, so
+		 * progress is one-dimensional — no join table, no extra query on the list.
+		 * `totalSeasons` is TMDB's count, snapshotted on save; it stays null for
+		 * movies, which is what marks an entry as not season-trackable.
+		 */
+		seasonsSeen: integer('seasons_seen').notNull().default(0),
+		totalSeasons: integer('total_seasons'),
+
 		addedAt: integer('added_at', { mode: 'timestamp' })
 			.notNull()
 			.$defaultFn(() => new Date())

@@ -31,6 +31,17 @@ export interface MediaResult {
 	voteAverage: number | null;
 }
 
+/**
+ * The saved-row state the detail modal needs to render its controls, so it can
+ * mirror the card without issuing a second query.
+ */
+export interface SavedEntry {
+	id: string;
+	watched: boolean;
+	seasonsSeen: number;
+	totalSeasons: number | null;
+}
+
 /** A single cast member, as shown in the detail view. */
 export interface CastMember {
 	name: string;

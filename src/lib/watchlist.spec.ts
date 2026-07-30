@@ -4,48 +4,43 @@ import { applyWatchlistView, countByStatus, type WatchlistEntry } from './watchl
 // Fixed "today" so the release-date assertions never drift with the calendar.
 const now = new Date('2026-07-29T12:00:00Z');
 
+/** Builds an entry with sensible defaults so each test states only what matters. */
+const entry = (over: Partial<WatchlistEntry> & { title: string }): WatchlistEntry => ({
+	mediaType: 'movie',
+	watched: false,
+	voteAverage: null,
+	releaseDate: null,
+	seasonsSeen: 0,
+	totalSeasons: null,
+	...over
+});
+
 const items: WatchlistEntry[] = [
-	{
-		title: 'The Matrix',
-		mediaType: 'movie',
-		watched: false,
-		voteAverage: 8.2,
-		releaseDate: '1999-03-31'
-	},
-	{
+	entry({ title: 'The Matrix', voteAverage: 8.2, releaseDate: '1999-03-31' }),
+	entry({
 		title: 'Breaking Bad',
 		mediaType: 'tv',
 		watched: true,
 		voteAverage: 8.9,
-		releaseDate: '2008-01-20'
-	},
-	{
-		title: 'Arrival',
-		mediaType: 'movie',
-		watched: true,
-		voteAverage: 7.6,
-		releaseDate: '2016-11-11'
-	},
-	{ title: 'Andor', mediaType: 'tv', watched: false, voteAverage: null, releaseDate: '2022-09-21' }
+		releaseDate: '2008-01-20',
+		seasonsSeen: 5,
+		totalSeasons: 5
+	}),
+	entry({ title: 'Arrival', watched: true, voteAverage: 7.6, releaseDate: '2016-11-11' }),
+	entry({
+		title: 'Andor',
+		mediaType: 'tv',
+		releaseDate: '2022-09-21',
+		seasonsSeen: 1,
+		totalSeasons: 2
+	})
 ];
 
 /** Two unreleased titles, deliberately in the "wrong" order for sort tests. */
 const withUpcoming: WatchlistEntry[] = [
 	...items,
-	{
-		title: 'Dune: Part Three',
-		mediaType: 'movie',
-		watched: false,
-		voteAverage: null,
-		releaseDate: '2027-03-18'
-	},
-	{
-		title: 'Untitled Sequel',
-		mediaType: 'movie',
-		watched: false,
-		voteAverage: 6.1,
-		releaseDate: '2026-12-25'
-	}
+	entry({ title: 'Dune: Part Three', releaseDate: '2027-03-18' }),
+	entry({ title: 'Untitled Sequel', voteAverage: 6.1, releaseDate: '2026-12-25' })
 ];
 
 const baseView = { status: 'all', type: 'all', sort: 'recent', query: '' };
@@ -63,6 +58,11 @@ describe('applyWatchlistView — filtering', () => {
 	it('filters by "watched" status', () => {
 		const result = applyWatchlistView(items, { ...baseView, status: 'watched' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Breaking Bad', 'Arrival']);
+	});
+
+	it('filters by "in progress" status — started shows that are not finished', () => {
+		const result = applyWatchlistView(items, { ...baseView, status: 'inProgress' }, now);
+		expect(result.map((i) => i.title)).toEqual(['Andor']);
 	});
 
 	it('filters by "upcoming" status', () => {
@@ -120,20 +120,33 @@ describe('applyWatchlistView — sorting', () => {
 });
 
 describe('countByStatus', () => {
-	it('counts all, to-watch, upcoming and watched', () => {
-		expect(countByStatus(items, now)).toEqual({ all: 4, toWatch: 2, upcoming: 0, watched: 2 });
+	it('counts every bucket', () => {
+		expect(countByStatus(items, now)).toEqual({
+			all: 4,
+			toWatch: 2,
+			inProgress: 1,
+			upcoming: 0,
+			watched: 2
+		});
 	});
 
 	it('counts unreleased titles independently of the watched flag', () => {
 		expect(countByStatus(withUpcoming, now)).toEqual({
 			all: 6,
 			toWatch: 4,
+			inProgress: 1,
 			upcoming: 2,
 			watched: 2
 		});
 	});
 
 	it('handles an empty list', () => {
-		expect(countByStatus([], now)).toEqual({ all: 0, toWatch: 0, upcoming: 0, watched: 0 });
+		expect(countByStatus([], now)).toEqual({
+			all: 0,
+			toWatch: 0,
+			inProgress: 0,
+			upcoming: 0,
+			watched: 0
+		});
 	});
 });

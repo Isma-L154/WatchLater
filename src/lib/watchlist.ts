@@ -1,3 +1,4 @@
+import { isTrackable } from './progress';
 import { getReleaseInfo, isUpcoming } from './release';
 import type { MediaType } from './types';
 
@@ -13,11 +14,13 @@ export interface WatchlistEntry {
 	watched: boolean;
 	voteAverage: number | null;
 	releaseDate: string | null;
+	seasonsSeen: number;
+	totalSeasons: number | null;
 }
 
 /** Current view options coming from the UI controls. */
 export interface WatchlistView {
-	/** 'all' | 'toWatch' | 'upcoming' | 'watched' */
+	/** 'all' | 'toWatch' | 'inProgress' | 'upcoming' | 'watched' */
 	status: string;
 	/** 'all' | 'movie' | 'tv' */
 	type: string;
@@ -47,7 +50,8 @@ export function applyWatchlistView<T extends WatchlistEntry>(
 			view.status === 'all' ||
 			(view.status === 'toWatch' && !item.watched) ||
 			(view.status === 'watched' && item.watched) ||
-			(view.status === 'upcoming' && isUpcoming(item.releaseDate, now));
+			(view.status === 'upcoming' && isUpcoming(item.releaseDate, now)) ||
+			(view.status === 'inProgress' && isInProgress(item));
 		const matchesType = view.type === 'all' || item.mediaType === view.type;
 		const matchesQuery = query === '' || item.title.toLowerCase().includes(query);
 		return matchesStatus && matchesType && matchesQuery;
@@ -66,6 +70,11 @@ export function applyWatchlistView<T extends WatchlistEntry>(
 	return sorted;
 }
 
+/** A show that has been started but not finished — "what was I in the middle of?" */
+export function isInProgress(item: WatchlistEntry): boolean {
+	return isTrackable(item) && item.seasonsSeen > 0 && !item.watched;
+}
+
 /** Count how many entries are in each status bucket (for the tab badges). */
 export function countByStatus(
 	items: readonly WatchlistEntry[],
@@ -73,16 +82,19 @@ export function countByStatus(
 ): {
 	all: number;
 	toWatch: number;
+	inProgress: number;
 	upcoming: number;
 	watched: number;
 } {
 	let watched = 0;
+	let inProgress = 0;
 	let upcoming = 0;
 	for (const item of items) {
 		if (item.watched) watched++;
+		if (isInProgress(item)) inProgress++;
 		if (isUpcoming(item.releaseDate, now)) upcoming++;
 	}
-	return { all: items.length, toWatch: items.length - watched, upcoming, watched };
+	return { all: items.length, toWatch: items.length - watched, inProgress, upcoming, watched };
 }
 
 /** Sort key for "coming soon": days until release, or Infinity when not upcoming. */

@@ -1,3 +1,7 @@
-# allow crawling everything by default
+# The home page is the only thing worth indexing.
 User-agent: *
-Disallow:
+Allow: /$
+# Keep crawlers off the TMDB proxy (it spends a shared, rate-limited API quota)
+# and off the sign-in flow, which only ever produces redirects.
+Disallow: /api/
+Disallow: /auth/
