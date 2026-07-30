@@ -3,7 +3,9 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
+	import { getReleaseInfo, releaseVerb } from '$lib/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import GoogleButton from '$lib/components/GoogleButton.svelte';
 	import type { MediaDetails, MediaType } from '$lib/types';
 
 	interface Props {
@@ -11,10 +13,12 @@
 		mediaType: MediaType;
 		/** DB id when the title is already saved, otherwise null. */
 		savedId: string | null;
+		/** Saving requires an account; signed-out visitors get a sign-in prompt. */
+		signedIn: boolean;
 		onClose: () => void;
 	}
 
-	let { tmdbId, mediaType, savedId, onClose }: Props = $props();
+	let { tmdbId, mediaType, savedId, signedIn, onClose }: Props = $props();
 
 	let details = $state<MediaDetails | null>(null);
 	let loading = $state(true);
@@ -80,6 +84,23 @@
 		const runtime = formatRuntime(details.runtimeMinutes);
 		if (runtime) parts.push(runtime);
 		return parts.join(' · ');
+	});
+
+	const release = $derived(details ? getReleaseInfo(details.releaseDate) : null);
+
+	/**
+	 * Countdown wording for the release banner. Kept separate from the date so
+	 * the banner reads as "when" followed by "how soon".
+	 */
+	const countdown = $derived.by(() => {
+		const days = release?.daysUntil;
+		if (!days) return '';
+		if (days === 1) return 'tomorrow';
+		if (days < 30) return `in ${days} days`;
+		const months = Math.round(days / 30);
+		if (months < 12) return `in about ${months} month${months > 1 ? 's' : ''}`;
+		const years = Math.round(days / 365);
+		return `in about ${years} year${years > 1 ? 's' : ''}`;
 	});
 </script>
 
@@ -181,6 +202,44 @@
 					</div>
 				</div>
 
+				<!-- Unreleased banner. TMDB indexes titles long before they come out,
+				     so this states plainly that the title isn't watchable yet. -->
+				{#if release && release.state !== 'released'}
+					<div
+						class="mt-4 flex items-start gap-3 rounded-xl border border-amber-300/20 bg-amber-300/[0.06] px-3.5 py-3"
+					>
+						<span class="relative mt-1.5 flex h-2 w-2 flex-shrink-0">
+							<span
+								class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-300 opacity-70"
+							></span>
+							<span class="relative inline-flex h-2 w-2 rounded-full bg-amber-300"></span>
+						</span>
+						<div class="min-w-0">
+							<p class="text-[11px] font-bold tracking-widest text-amber-300 uppercase">
+								Not out yet
+							</p>
+							{#if release.state === 'upcoming'}
+								<p class="mt-0.5 text-sm text-slate-200">
+									{releaseVerb(details.mediaType)}
+									{release.fullDate}
+								</p>
+								<p class="mt-0.5 text-xs text-amber-200/70">
+									{countdown}{details.productionStatus
+										? ` · ${details.productionStatus.toLowerCase()}`
+										: ''}
+								</p>
+							{:else}
+								<p class="mt-0.5 text-sm text-slate-200">No release date announced yet.</p>
+								{#if details.productionStatus}
+									<p class="mt-0.5 text-xs text-amber-200/70">
+										Currently {details.productionStatus.toLowerCase()}
+									</p>
+								{/if}
+							{/if}
+						</div>
+					</div>
+				{/if}
+
 				{#if details.genres.length}
 					<div class="mt-4 flex flex-wrap gap-2">
 						{#each details.genres as genre (genre)}
@@ -203,7 +262,9 @@
 
 				<!-- Save / remove -->
 				<div class="mt-5">
-					{#if savedId}
+					{#if !signedIn}
+						<GoogleButton size="full" label="Sign in to save this" />
+					{:else if savedId}
 						<form
 							method="POST"
 							action="?/remove"

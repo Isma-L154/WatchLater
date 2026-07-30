@@ -6,6 +6,17 @@
 export type MediaType = 'movie' | 'tv';
 
 /**
+ * The signed-in user, as exposed to the UI. Deliberately a narrow subset of the
+ * database row — no timestamps, no provider ids, nothing the browser can't see.
+ */
+export interface SessionUser {
+	id: string;
+	name: string;
+	email: string;
+	avatarUrl: string | null;
+}
+
+/**
  * A normalized, media-type-agnostic representation of a movie or TV show.
  * This is the shape our own API returns, decoupling the UI from TMDB's raw
  * response format (which differs between movies and TV shows).
@@ -39,6 +50,12 @@ export interface MediaDetails {
 	runtimeMinutes: number | null;
 	/** TV only: number of seasons. */
 	seasons: number | null;
+	/**
+	 * TMDB production status ("Released", "Post Production", "In Production",
+	 * "Planned", "Returning Series"…). Used to explain *why* a title has no
+	 * release date yet.
+	 */
+	productionStatus: string | null;
 	voteAverage: number | null;
 	backdropPath: string | null;
 	posterPath: string | null;

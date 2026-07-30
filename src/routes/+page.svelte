@@ -1,13 +1,19 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import { replaceState } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { fade } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import MediaCard from '$lib/components/MediaCard.svelte';
 	import MediaDetailModal from '$lib/components/MediaDetailModal.svelte';
 	import SegmentedControl from '$lib/components/SegmentedControl.svelte';
+	import GoogleButton from '$lib/components/GoogleButton.svelte';
+	import AccountChip from '$lib/components/AccountChip.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { applyWatchlistView, countByStatus } from '$lib/watchlist';
+	import { getReleaseInfo } from '$lib/release';
 	import type { MediaResult, MediaType } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -15,6 +21,8 @@
 
 	// Shared responsive grid layout for every poster grid on the page.
 	const gridClass = 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
+
+	const signedIn = $derived(Boolean(data.user));
 
 	// --- Search state ---
 	let query = $state('');
@@ -36,6 +44,20 @@
 		selected = { tmdbId: item.tmdbId, mediaType: item.mediaType };
 	}
 
+	/**
+	 * Surface the outcome of the OAuth round-trip, which comes back as a query
+	 * parameter, then strip it so a refresh doesn't replay the message.
+	 */
+	$effect(() => {
+		const outcome = page.url.searchParams.get('auth');
+		if (!outcome) return;
+
+		if (outcome === 'error') toasts.add('Could not sign you in. Please try again.', 'error');
+		else if (outcome === 'unavailable') toasts.add('Sign-in is not configured yet.', 'error');
+
+		replaceState(page.url.pathname, page.state);
+	});
+
 	// --- Derived values ---
 	const savedKeys = $derived(new Set(data.items.map((i) => key(i.tmdbId, i.mediaType))));
 
@@ -47,6 +69,17 @@
 	);
 
 	const counts = $derived(countByStatus(data.items));
+
+	// The "Upcoming" lens only earns its place once something in the list is
+	// actually unreleased.
+	const statusOptions = $derived([
+		{ value: 'all', label: 'All', count: counts.all },
+		{ value: 'toWatch', label: 'To Watch', count: counts.toWatch },
+		...(counts.upcoming > 0
+			? [{ value: 'upcoming', label: 'Upcoming', count: counts.upcoming }]
+			: []),
+		{ value: 'watched', label: 'Watched', count: counts.watched }
+	]);
 
 	// Status/type/search filtering plus sorting, all in one pure helper.
 	const visibleItems = $derived(
@@ -103,6 +136,15 @@
 	}
 
 	/**
+	 * "Mark as watched" still works on an unreleased title (early screenings and
+	 * premieres exist), but it shouldn't be the loudest thing on the card when
+	 * the title isn't out — so it drops to a quiet, secondary style.
+	 */
+	function isUnreleased(releaseDate: string | null): boolean {
+		return getReleaseInfo(releaseDate).state !== 'released';
+	}
+
+	/**
 	 * Progressive-enhancement helper: after the action completes it refreshes
 	 * the page data and shows a toast reflecting the outcome.
 	 */
@@ -135,7 +177,15 @@
 		onSelect={() => openDetails(item)}
 	>
 		{#snippet actions()}
-			{#if savedKeys.has(key(item.tmdbId, item.mediaType))}
+			{#if !signedIn}
+				<a
+					href={resolve('/auth/google')}
+					data-sveltekit-reload
+					class="block w-full rounded-lg bg-white/5 py-2 text-center text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white"
+				>
+					Sign in to save
+				</a>
+			{:else if savedKeys.has(key(item.tmdbId, item.mediaType))}
 				<span
 					class="flex items-center justify-center gap-1 rounded-lg bg-emerald-500/15 py-2 text-xs font-semibold text-emerald-400"
 				>
@@ -179,18 +229,31 @@
 
 <div class="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-20 sm:px-6">
 	<!-- Hero -->
-	<header class="pt-8 pb-4 sm:pt-12">
-		<div class="flex items-center gap-2">
-			<span class="text-3xl">🎬</span>
-			<h1 class="text-2xl font-black tracking-tight sm:text-4xl">
-				Watch<span class="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent"
-					>Later</span
-				>
-			</h1>
+	<header class="pt-6 pb-4 sm:pt-10">
+		<div class="flex items-start justify-between gap-4">
+			<div>
+				<div class="flex items-center gap-2">
+					<span class="text-3xl">🎬</span>
+					<h1 class="text-2xl font-black tracking-tight sm:text-4xl">
+						Watch<span
+							class="bg-gradient-to-r from-sky-400 to-indigo-400 bg-clip-text text-transparent"
+							>Later</span
+						>
+					</h1>
+				</div>
+				<p class="mt-2 max-w-md text-sm text-slate-400 sm:text-base">
+					Discover movies & TV shows and build your personal watchlist.
+				</p>
+			</div>
+
+			<div class="flex-shrink-0 pt-1">
+				{#if data.user}
+					<AccountChip user={data.user} />
+				{:else if data.authAvailable}
+					<GoogleButton />
+				{/if}
+			</div>
 		</div>
-		<p class="mt-2 max-w-md text-sm text-slate-400 sm:text-base">
-			Discover movies & TV shows and build your personal watchlist.
-		</p>
 	</header>
 
 	<!-- Sticky search bar -->
@@ -274,7 +337,7 @@
 	<section>
 		<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 			<h2 class="text-lg font-bold text-slate-100">Your Watchlist</h2>
-			{#if counts.all > 0}
+			{#if signedIn && counts.all > 0}
 				<div class="flex flex-wrap items-center gap-2">
 					<label class="relative">
 						<span class="sr-only">Filter your watchlist</span>
@@ -286,14 +349,7 @@
 							class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-1.5 pr-3 pl-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 focus:outline-none sm:w-44 sm:text-sm"
 						/>
 					</label>
-					<SegmentedControl
-						bind:value={statusTab}
-						options={[
-							{ value: 'all', label: 'All', count: counts.all },
-							{ value: 'toWatch', label: 'To Watch', count: counts.toWatch },
-							{ value: 'watched', label: 'Watched', count: counts.watched }
-						]}
-					/>
+					<SegmentedControl bind:value={statusTab} options={statusOptions} />
 					<SegmentedControl
 						bind:value={typeFilter}
 						options={[
@@ -311,13 +367,37 @@
 							<option value="recent">Recently added</option>
 							<option value="rating">Top rated</option>
 							<option value="title">A–Z</option>
+							{#if counts.upcoming > 0}
+								<option value="soonest">Releasing soonest</option>
+							{/if}
 						</select>
 					</label>
 				</div>
 			{/if}
 		</div>
 
-		{#if counts.all === 0}
+		{#if !signedIn}
+			<!-- Signed-out state. Browsing stays open; the list itself is private. -->
+			<div
+				class="rounded-2xl border border-white/10 bg-slate-900/40 px-6 py-14 text-center sm:py-16"
+			>
+				<p class="text-5xl">🔐</p>
+				<p class="mt-4 text-lg font-semibold text-slate-100">Your list, and only yours</p>
+				<p class="mx-auto mt-2 max-w-sm text-sm text-slate-400">
+					Sign in with Google to save titles. Your watchlist stays tied to your account — nobody
+					else can see or change it.
+				</p>
+				{#if data.authAvailable}
+					<div class="mx-auto mt-6 max-w-xs">
+						<GoogleButton size="full" />
+					</div>
+				{:else}
+					<p class="mt-6 text-xs text-amber-300/80">
+						Sign-in is not configured on this deployment yet.
+					</p>
+				{/if}
+			</div>
+		{:else if counts.all === 0}
 			<div class="rounded-2xl border border-dashed border-white/10 px-6 py-16 text-center">
 				<p class="text-5xl">🍿</p>
 				<p class="mt-3 font-medium text-slate-300">Your watchlist is empty</p>
@@ -367,7 +447,9 @@
 											class="w-full rounded-lg py-2 text-xs font-semibold transition active:scale-95
 												{item.watched
 												? 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-												: 'bg-emerald-500/90 text-white hover:bg-emerald-400'}"
+												: isUnreleased(item.releaseDate)
+													? 'bg-white/5 text-slate-400 ring-1 ring-white/10 ring-inset hover:bg-white/10 hover:text-slate-200'
+													: 'bg-emerald-500/90 text-white hover:bg-emerald-400'}"
 										>
 											{item.watched ? '↺ Unwatch' : '✓ Watched'}
 										</button>
@@ -401,6 +483,7 @@
 		tmdbId={selected.tmdbId}
 		mediaType={selected.mediaType}
 		savedId={selectedSavedId}
+		{signedIn}
 		onClose={() => (selected = null)}
 	/>
 {/if}

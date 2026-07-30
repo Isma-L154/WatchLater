@@ -101,6 +101,7 @@ interface TmdbDetailsRaw extends TmdbRawResult {
 	episode_run_time?: number[];
 	tagline?: string;
 	number_of_seasons?: number;
+	status?: string;
 	backdrop_path?: string | null;
 	credits?: { cast?: TmdbCastRaw[] };
 	videos?: { results?: TmdbVideoRaw[] };
@@ -131,6 +132,7 @@ export async function getDetails(mediaType: MediaType, id: number): Promise<Medi
 		releaseDate: raw.release_date ?? raw.first_air_date ?? null,
 		runtimeMinutes: raw.runtime ?? raw.episode_run_time?.[0] ?? null,
 		seasons: raw.number_of_seasons ?? null,
+		productionStatus: raw.status?.trim() || null,
 		voteAverage: raw.vote_average ?? null,
 		backdropPath: raw.backdrop_path ?? null,
 		posterPath: raw.poster_path ?? null,

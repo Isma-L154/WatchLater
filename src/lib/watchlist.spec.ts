@@ -1,80 +1,139 @@
 import { describe, expect, it } from 'vitest';
 import { applyWatchlistView, countByStatus, type WatchlistEntry } from './watchlist';
 
+// Fixed "today" so the release-date assertions never drift with the calendar.
+const now = new Date('2026-07-29T12:00:00Z');
+
 const items: WatchlistEntry[] = [
-	{ title: 'The Matrix', mediaType: 'movie', watched: false, voteAverage: 8.2 },
-	{ title: 'Breaking Bad', mediaType: 'tv', watched: true, voteAverage: 8.9 },
-	{ title: 'Arrival', mediaType: 'movie', watched: true, voteAverage: 7.6 },
-	{ title: 'Andor', mediaType: 'tv', watched: false, voteAverage: null }
+	{
+		title: 'The Matrix',
+		mediaType: 'movie',
+		watched: false,
+		voteAverage: 8.2,
+		releaseDate: '1999-03-31'
+	},
+	{
+		title: 'Breaking Bad',
+		mediaType: 'tv',
+		watched: true,
+		voteAverage: 8.9,
+		releaseDate: '2008-01-20'
+	},
+	{
+		title: 'Arrival',
+		mediaType: 'movie',
+		watched: true,
+		voteAverage: 7.6,
+		releaseDate: '2016-11-11'
+	},
+	{ title: 'Andor', mediaType: 'tv', watched: false, voteAverage: null, releaseDate: '2022-09-21' }
+];
+
+/** Two unreleased titles, deliberately in the "wrong" order for sort tests. */
+const withUpcoming: WatchlistEntry[] = [
+	...items,
+	{
+		title: 'Dune: Part Three',
+		mediaType: 'movie',
+		watched: false,
+		voteAverage: null,
+		releaseDate: '2027-03-18'
+	},
+	{
+		title: 'Untitled Sequel',
+		mediaType: 'movie',
+		watched: false,
+		voteAverage: 6.1,
+		releaseDate: '2026-12-25'
+	}
 ];
 
 const baseView = { status: 'all', type: 'all', sort: 'recent', query: '' };
 
 describe('applyWatchlistView — filtering', () => {
 	it('returns everything by default', () => {
-		expect(applyWatchlistView(items, baseView)).toHaveLength(4);
+		expect(applyWatchlistView(items, baseView, now)).toHaveLength(4);
 	});
 
 	it('filters by "to watch" status', () => {
-		const result = applyWatchlistView(items, { ...baseView, status: 'toWatch' });
+		const result = applyWatchlistView(items, { ...baseView, status: 'toWatch' }, now);
 		expect(result.map((i) => i.title)).toEqual(['The Matrix', 'Andor']);
 	});
 
 	it('filters by "watched" status', () => {
-		const result = applyWatchlistView(items, { ...baseView, status: 'watched' });
+		const result = applyWatchlistView(items, { ...baseView, status: 'watched' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Breaking Bad', 'Arrival']);
 	});
 
+	it('filters by "upcoming" status', () => {
+		const result = applyWatchlistView(withUpcoming, { ...baseView, status: 'upcoming' }, now);
+		expect(result.map((i) => i.title)).toEqual(['Dune: Part Three', 'Untitled Sequel']);
+	});
+
 	it('filters by media type', () => {
-		const result = applyWatchlistView(items, { ...baseView, type: 'tv' });
+		const result = applyWatchlistView(items, { ...baseView, type: 'tv' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Breaking Bad', 'Andor']);
 	});
 
 	it('filters by a case-insensitive title query', () => {
-		const result = applyWatchlistView(items, { ...baseView, query: 'ARR' });
+		const result = applyWatchlistView(items, { ...baseView, query: 'ARR' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Arrival']);
 	});
 
 	it('combines status, type and query', () => {
-		const result = applyWatchlistView(items, {
-			...baseView,
-			status: 'toWatch',
-			type: 'tv',
-			query: 'and'
-		});
+		const result = applyWatchlistView(
+			items,
+			{ ...baseView, status: 'toWatch', type: 'tv', query: 'and' },
+			now
+		);
 		expect(result.map((i) => i.title)).toEqual(['Andor']);
 	});
 });
 
 describe('applyWatchlistView — sorting', () => {
 	it('preserves input order for "recent"', () => {
-		const result = applyWatchlistView(items, baseView);
+		const result = applyWatchlistView(items, baseView, now);
 		expect(result.map((i) => i.title)).toEqual(['The Matrix', 'Breaking Bad', 'Arrival', 'Andor']);
 	});
 
 	it('sorts by rating (desc, nulls last)', () => {
-		const result = applyWatchlistView(items, { ...baseView, sort: 'rating' });
+		const result = applyWatchlistView(items, { ...baseView, sort: 'rating' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Breaking Bad', 'The Matrix', 'Arrival', 'Andor']);
 	});
 
 	it('sorts by title (A–Z)', () => {
-		const result = applyWatchlistView(items, { ...baseView, sort: 'title' });
+		const result = applyWatchlistView(items, { ...baseView, sort: 'title' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Andor', 'Arrival', 'Breaking Bad', 'The Matrix']);
+	});
+
+	it('sorts by "soonest", pushing already-released titles to the end', () => {
+		const result = applyWatchlistView(withUpcoming, { ...baseView, sort: 'soonest' }, now);
+		expect(result.slice(0, 2).map((i) => i.title)).toEqual(['Untitled Sequel', 'Dune: Part Three']);
+		expect(result).toHaveLength(6);
 	});
 
 	it('does not mutate the input array', () => {
 		const snapshot = items.map((i) => i.title);
-		applyWatchlistView(items, { ...baseView, sort: 'title' });
+		applyWatchlistView(items, { ...baseView, sort: 'title' }, now);
 		expect(items.map((i) => i.title)).toEqual(snapshot);
 	});
 });
 
 describe('countByStatus', () => {
-	it('counts all, to-watch and watched', () => {
-		expect(countByStatus(items)).toEqual({ all: 4, toWatch: 2, watched: 2 });
+	it('counts all, to-watch, upcoming and watched', () => {
+		expect(countByStatus(items, now)).toEqual({ all: 4, toWatch: 2, upcoming: 0, watched: 2 });
+	});
+
+	it('counts unreleased titles independently of the watched flag', () => {
+		expect(countByStatus(withUpcoming, now)).toEqual({
+			all: 6,
+			toWatch: 4,
+			upcoming: 2,
+			watched: 2
+		});
 	});
 
 	it('handles an empty list', () => {
-		expect(countByStatus([])).toEqual({ all: 0, toWatch: 0, watched: 0 });
+		expect(countByStatus([], now)).toEqual({ all: 0, toWatch: 0, upcoming: 0, watched: 0 });
 	});
 });

@@ -8,13 +8,15 @@ A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.
 
 ## ✨ Features
 
+- 🔐 **Sign in with Google** — each watchlist is private and tied to its owner's account.
 - 🔍 **Live search** of movies and TV shows (debounced, powered by TMDB multi-search).
 - 🔥 **Trending this week** on the home screen (server-rendered, instant).
 - 🗂️ **Watchlist management** — add, remove, and mark titles as watched.
-- 🎛️ **Tabs, filters & sorting** — All / To Watch / Watched, Movie / TV filter, and sort options.
+- ⏳ **Unreleased titles are called out** — TMDB indexes films long before they open, so anything not out yet carries an amber countdown badge and an "Upcoming" filter.
+- 🎛️ **Tabs, filters & sorting** — All / To Watch / Upcoming / Watched, Movie / TV filter, and sort options.
 - 🎞️ **Detail view** — a modal with backdrop, embedded YouTube trailer, genres, synopsis, and cast.
 - 🔔 **Toasts, skeletons, and smooth animations** for a polished feel.
-- 🔒 **Secure by design** — the TMDB token never reaches the browser; all TMDB calls are proxied server-side.
+- 🔒 **Secure by design** — the TMDB token and OAuth secret never reach the browser; all TMDB calls are proxied server-side.
 
 ## 🧱 Tech Stack
 
@@ -54,13 +56,33 @@ The app runs at **http://localhost:5173**.
 
 ### Environment variables
 
-| Variable              | Description                                                                                                               |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `TMDB_ACCESS_TOKEN`   | TMDB **v4 "API Read Access Token"** (Bearer). Get it at [TMDB → Settings → API](https://www.themoviedb.org/settings/api). |
-| `DATABASE_URL`        | `file:local.db` for local dev, or your `libsql://…turso.io` URL in production.                                            |
-| `DATABASE_AUTH_TOKEN` | Turso auth token (leave empty for the local file DB).                                                                     |
+| Variable               | Description                                                                                                               |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `TMDB_ACCESS_TOKEN`    | TMDB **v4 "API Read Access Token"** (Bearer). Get it at [TMDB → Settings → API](https://www.themoviedb.org/settings/api). |
+| `DATABASE_URL`         | `file:local.db` for local dev, or your `libsql://…turso.io` URL in production.                                            |
+| `DATABASE_AUTH_TOKEN`  | Turso auth token (leave empty for the local file DB).                                                                     |
+| `GOOGLE_CLIENT_ID`     | OAuth 2.0 client ID (see [Google sign-in setup](#-google-sign-in-setup)).                                                 |
+| `GOOGLE_CLIENT_SECRET` | OAuth 2.0 client secret.                                                                                                  |
+| `OAUTH_ORIGIN`         | _Optional._ Public origin used to build the OAuth redirect URI. Leave unset to derive it from the request.                |
 
 > ⚠️ `.env` is git-ignored and must **never** be committed. Only `.env.example` (without values) is tracked.
+
+### 🔑 Google sign-in setup
+
+1. Open the [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. **Create credentials → OAuth client ID → Web application**.
+3. Under **Authorized redirect URIs**, add one entry per environment you use:
+   - `http://localhost:5173/auth/google/callback`
+   - `https://<your-domain>/auth/google/callback`
+4. Copy the client ID and secret into `.env`.
+
+Only the `openid`, `profile` and `email` scopes are requested, and no Google tokens
+are stored — the access token is used once, during the callback, and discarded.
+
+> **Migrating an existing list.** The auth migration parks watchlist rows saved
+> before sign-in existed under a placeholder account, and the **first** person to
+> sign in inherits them. If your instance is public, sign in yourself before
+> sharing the link, or those rows will end up on someone else's account.
 
 ## 🛠️ Scripts
 
@@ -89,17 +111,23 @@ The app runs at **http://localhost:5173**.
 
 ```
 src/
+├─ hooks.server.ts       # Resolves the session cookie into `locals.user`
 ├─ lib/
 │  ├─ components/        # Reusable UI (MediaCard, MediaDetailModal, Toaster, …)
 │  ├─ server/
 │  │  ├─ db/             # Drizzle client + schema (server-only)
+│  │  ├─ auth.ts         # Session create/validate/revoke + cookie helpers
+│  │  ├─ oauth.ts        # Google OAuth client — client secret stays here
 │  │  └─ tmdb.ts         # TMDB proxy (search, trending, details) — token stays here
 │  ├─ stores/            # Svelte 5 rune stores (toasts)
+│  ├─ release.ts         # Release-date reasoning (released / upcoming / TBA)
 │  ├─ tmdb-image.ts      # Client-safe image URL helpers
 │  └─ types.ts           # Shared, client-safe types
 └─ routes/
+   ├─ +layout.server.ts  # Exposes the signed-in user to every page
    ├─ +page.svelte       # Home: search, trending, watchlist
    ├─ +page.server.ts    # Load watchlist + trending; add/remove/toggle actions
+   ├─ auth/              # /auth/google, /auth/google/callback, /auth/logout
    └─ api/               # /api/search, /api/details/[type]/[id]
 ```
 
@@ -134,12 +162,20 @@ Then set the production secrets (they are **not** read from `.env` in production
 npx wrangler secret put TMDB_ACCESS_TOKEN
 npx wrangler secret put DATABASE_URL
 npx wrangler secret put DATABASE_AUTH_TOKEN
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
+
+Remember to add the production callback URL
+(`https://<your-domain>/auth/google/callback`) to the Google OAuth client.
 
 ## 🔐 Security
 
-- The TMDB token lives only in server-side modules (`$lib/server/*`) and is sent to TMDB via a `Bearer` header — it is never exposed to the client bundle.
+- The TMDB token and the Google client secret live only in server-side modules (`$lib/server/*`) — they are never exposed to the client bundle.
 - Secrets are provided through environment variables (`.env` locally, Wrangler secrets in production) and never hard-coded.
+- Sign-in uses OAuth 2.0 with **PKCE** plus a `state` parameter, both carried in short-lived `httpOnly` cookies.
+- The session cookie holds a 256-bit random token; the database stores only its **SHA-256 hash**, so a database dump cannot be replayed as a valid session.
+- Every watchlist read _and_ write is scoped by the session's user id — item ids travel through the browser, so knowing someone else's id is not enough to touch their list.
 
 ## 📄 License
 
