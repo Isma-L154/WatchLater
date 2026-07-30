@@ -41,7 +41,7 @@ If non-contiguous viewing ever matters, the counter migrates cleanly
 watched = totalSeasons != null && seasonsSeen >= totalSeasons
 ```
 
-`deriveWatched()` in [`src/lib/progress.ts`](../src/lib/progress.ts) owns this,
+`deriveWatched()` in [`src/lib/domain/progress.ts`](../src/lib/domain/progress.ts) owns this,
 and the server applies it on **every** write — never the UI alone — so a stale
 tab or a replayed form post cannot leave progress and status disagreeing.
 
@@ -90,10 +90,11 @@ to 1 is pure friction. Multi-season shows get:
 
 ## Files
 
-| File                                      | Role                                            |
-| ----------------------------------------- | ----------------------------------------------- |
-| `src/lib/progress.ts`                     | Pure logic: state, clamping, the invariant.     |
-| `src/lib/progress.spec.ts`                | Unit tests for all of the above.                |
-| `src/lib/components/SeasonStepper.svelte` | The card control.                               |
-| `src/routes/+page.server.ts`              | `setSeasons` / `toggleWatched` actions.         |
-| `drizzle/0002_polite_gorgon.sql`          | The migration (plain `ADD COLUMN`, no rebuild). |
+| File                                            | Role                                            |
+| ----------------------------------------------- | ----------------------------------------------- |
+| `src/lib/domain/progress.ts`                    | Pure logic: state, clamping, the invariant.     |
+| `src/lib/domain/progress.spec.ts`               | Unit tests for all of the above.                |
+| `src/lib/components/media/SeasonStepper.svelte` | The card control.                               |
+| `src/lib/components/media/WatchlistCard.svelte` | Chooses stepper vs. plain watched toggle.       |
+| `src/routes/+page.server.ts`                    | `setSeasons` / `toggleWatched` actions.         |
+| `drizzle/0002_polite_gorgon.sql`                | The migration (plain `ADD COLUMN`, no rebuild). |

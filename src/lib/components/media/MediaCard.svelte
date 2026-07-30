@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { posterUrl, releaseYear } from '$lib/tmdb-image';
-	import { getReleaseInfo } from '$lib/release';
+	import { getReleaseInfo } from '$lib/domain/release';
 	import type { MediaType } from '$lib/types';
 
 	interface Props {

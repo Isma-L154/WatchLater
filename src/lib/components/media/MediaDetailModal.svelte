@@ -3,9 +3,9 @@
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
-	import { getReleaseInfo, releaseVerb } from '$lib/release';
+	import { getReleaseInfo, releaseVerb } from '$lib/domain/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import GoogleButton from '$lib/components/GoogleButton.svelte';
+	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import type { MediaDetails, MediaType, SavedEntry } from '$lib/types';
 
 	interface Props {

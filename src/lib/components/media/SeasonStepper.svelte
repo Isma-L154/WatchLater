@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import type { SeasonProgress } from '$lib/progress';
+	import type { SeasonProgress } from '$lib/domain/progress';
 
 	/**
 	 * Compact season counter for a watchlist card.

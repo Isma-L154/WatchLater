@@ -1,6 +1,6 @@
 <script lang="ts">
-	import SegmentedControl from './SegmentedControl.svelte';
-	import type { countByStatus } from '$lib/watchlist';
+	import SegmentedControl from '$lib/components/ui/SegmentedControl.svelte';
+	import type { countByStatus } from '$lib/domain/watchlist';
 
 	interface Props {
 		counts: ReturnType<typeof countByStatus>;

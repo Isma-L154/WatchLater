@@ -114,16 +114,20 @@ are stored — the access token is used once, during the callback, and discarded
 src/
 ├─ hooks.server.ts       # Session resolution + baseline security headers
 ├─ lib/
-│  ├─ components/        # Presentational units — each owns one piece of the page
+│  ├─ components/
+│  │  ├─ auth/           # GoogleButton, AccountChip
+│  │  ├─ media/          # Anything that renders a title: cards, modal, stepper
+│  │  └─ ui/             # App chrome and generic primitives
+│  ├─ domain/            # Pure business rules — no DOM, no DB, unit-tested
+│  │  ├─ progress.ts     # Season tracking: state, clamping, watched invariant
+│  │  ├─ release.ts      # Release-date reasoning (released / upcoming / TBA)
+│  │  └─ watchlist.ts    # List filtering, sorting and status counts
 │  ├─ server/            # Never reaches the browser (SvelteKit enforces this)
 │  │  ├─ db/             # Drizzle client + schema
 │  │  ├─ auth.ts         # Session create/validate/revoke + cookie helpers
 │  │  ├─ oauth.ts        # Google OAuth client — client secret stays here
 │  │  └─ tmdb.ts         # TMDB proxy (search, trending, details) — token stays here
 │  ├─ stores/            # Svelte 5 rune stores (search, toasts)
-│  ├─ progress.ts        # Season tracking: state, clamping, watched invariant
-│  ├─ release.ts         # Release-date reasoning (released / upcoming / TBA)
-│  ├─ watchlist.ts       # List filtering, sorting and status counts
 │  ├─ tmdb-image.ts      # Client-safe image URL helpers
 │  └─ types.ts           # Shared, client-safe types
 └─ routes/
@@ -134,10 +138,17 @@ src/
    └─ api/               # /api/search, /api/details/[type]/[id]
 ```
 
-The rule of thumb: **decision logic lives in `$lib` as pure functions with unit
-tests** (`progress.ts`, `release.ts`, `watchlist.ts`), components render it, and
-routes only wire the two together. That is why the test suite needs no DOM and
-no database.
+Three rules keep this navigable as it grows:
+
+1. **Decision logic lives in `$lib/domain` as pure functions**, next to its own
+   unit tests. That is why the suite needs no DOM and no database.
+2. **Components render; they don't decide.** Each owns one piece of the page.
+3. **Routes only wire the two together** — `+page.svelte` is composition.
+
+Everything in the repository root is a tool's mandated config location
+(`vite.config.ts`, `wrangler.jsonc`, `eslint.config.js`, …). They cannot be
+tidied into a folder without passing `--config` to every command, which trades
+one kind of noise for a worse one.
 
 ## ☁️ Deployment
 

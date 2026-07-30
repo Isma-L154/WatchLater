@@ -3,7 +3,7 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { watchlistItem } from '$lib/server/db/schema';
 import { getDetails, getTrending } from '$lib/server/tmdb';
-import { clampSeasons, deriveWatched, normalizeTotalSeasons } from '$lib/progress';
+import { clampSeasons, deriveWatched, normalizeTotalSeasons } from '$lib/domain/progress';
 import type { MediaResult, MediaType } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 

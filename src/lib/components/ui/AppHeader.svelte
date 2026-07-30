@@ -1,6 +1,6 @@
 <script lang="ts">
-	import AccountChip from './AccountChip.svelte';
-	import GoogleButton from './GoogleButton.svelte';
+	import AccountChip from '$lib/components/auth/AccountChip.svelte';
+	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import type { SessionUser } from '$lib/types';
 
 	interface Props {

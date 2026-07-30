@@ -1,4 +1,4 @@
-import type { MediaType } from './types';
+import type { MediaType } from '../types';
 
 /**
  * Release-date reasoning, kept pure and framework-agnostic so it can be unit

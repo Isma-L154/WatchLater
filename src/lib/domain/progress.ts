@@ -1,4 +1,4 @@
-import type { MediaType } from './types';
+import type { MediaType } from '../types';
 
 /**
  * Season-level progress for TV shows, kept pure so it can be unit tested and

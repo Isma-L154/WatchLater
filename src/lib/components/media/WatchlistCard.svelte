@@ -3,8 +3,8 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import MediaCard from './MediaCard.svelte';
 	import SeasonStepper from './SeasonStepper.svelte';
-	import { getSeasonProgress } from '$lib/progress';
-	import { getReleaseInfo } from '$lib/release';
+	import { getSeasonProgress } from '$lib/domain/progress';
+	import { getReleaseInfo } from '$lib/domain/release';
 	import type { WatchlistItem } from '$lib/server/db/schema';
 
 	/**

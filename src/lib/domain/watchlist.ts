@@ -1,6 +1,6 @@
 import { isTrackable } from './progress';
 import { getReleaseInfo, isUpcoming } from './release';
-import type { MediaType } from './types';
+import type { MediaType } from '../types';
 
 /**
  * Pure, framework-agnostic filtering and sorting for the watch-later list.

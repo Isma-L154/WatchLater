@@ -4,16 +4,16 @@
 	import { fade } from 'svelte/transition';
 	import { flip } from 'svelte/animate';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import AppHeader from '$lib/components/AppHeader.svelte';
-	import SearchBar from '$lib/components/SearchBar.svelte';
-	import DiscoverCard from '$lib/components/DiscoverCard.svelte';
-	import WatchlistCard from '$lib/components/WatchlistCard.svelte';
-	import WatchlistToolbar from '$lib/components/WatchlistToolbar.svelte';
-	import MediaDetailModal from '$lib/components/MediaDetailModal.svelte';
-	import GoogleButton from '$lib/components/GoogleButton.svelte';
+	import AppHeader from '$lib/components/ui/AppHeader.svelte';
+	import SearchBar from '$lib/components/ui/SearchBar.svelte';
+	import DiscoverCard from '$lib/components/media/DiscoverCard.svelte';
+	import WatchlistCard from '$lib/components/media/WatchlistCard.svelte';
+	import WatchlistToolbar from '$lib/components/media/WatchlistToolbar.svelte';
+	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
+	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import { applyWatchlistView, countByStatus } from '$lib/watchlist';
+	import { applyWatchlistView, countByStatus } from '$lib/domain/watchlist';
 	import type { MediaType, SavedEntry } from '$lib/types';
 	import type { PageData } from './$types';
 
