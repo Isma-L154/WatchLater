@@ -106,7 +106,7 @@ are stored — the access token is used once, during the callback, and discarded
 
 - **Unit tests (Vitest):** cover the pure logic — image URL helpers and the watchlist filtering/sorting/search (`src/lib/*.spec.ts`). Run with `npm run test:unit`.
 - **E2E (Playwright):** smoke tests that drive the running app (`e2e/*.e2e.ts`). They run against the dev server and therefore need a local `.env`, so they are a manual/local step (not part of CI). Run with `npm run test:e2e`.
-- **CI (GitHub Actions):** `.github/workflows/ci.yml` runs Prettier, ESLint, `svelte-check` and the unit tests on every push and pull request to `main` / `dev`.
+- **CI (GitHub Actions):** `.github/workflows/ci.yml` runs Prettier, ESLint, `svelte-check` and the unit tests on every push and pull request to `main` / `dev`. A push to `main` that clears those checks then deploys to Cloudflare — pull requests never do, so a fork cannot publish to production.
 
 ## 🗂️ Project Structure
 
@@ -116,7 +116,7 @@ src/
 ├─ lib/
 │  ├─ components/
 │  │  ├─ auth/           # GoogleButton, AccountChip
-│  │  ├─ media/          # Anything that renders a title: cards, modal, stepper
+│  │  ├─ media/          # Anything that renders a title: cards, modal, season tracking
 │  │  └─ ui/             # App chrome and generic primitives
 │  ├─ domain/            # Pure business rules — no DOM, no DB, unit-tested
 │  │  ├─ progress.ts     # Season tracking: state, clamping, watched invariant
@@ -170,12 +170,24 @@ npm run db:migrate
 
 ### 2. Deploy to Cloudflare
 
+Pushes to `main` deploy automatically once CI passes (see
+`.github/workflows/ci.yml`). This needs one repository secret:
+
+| Secret                 | Where to get it                                                                       |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare dashboard → My Profile → API Tokens → template **Edit Cloudflare Workers** |
+
+Add it under _Settings → Secrets and variables → Actions_. Runtime secrets stay
+in Cloudflare (below) and are deliberately **not** managed from CI.
+
+To deploy by hand instead:
+
 ```bash
-npm run build
+npx vite build     # not `npm run build`: that also runs `wrangler types --check`
 npx wrangler deploy
 ```
 
-Then set the production secrets (they are **not** read from `.env` in production):
+Set the production secrets once (they are **not** read from `.env` in production):
 
 ```bash
 npx wrangler secret put TMDB_ACCESS_TOKEN

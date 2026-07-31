@@ -34,3 +34,42 @@ jobs:
 
       - name: Unit tests (Vitest)
         run: npm run test:unit -- --run --project server
+
+  deploy:
+    name: Deploy to Cloudflare
+    # Only after the quality gate passes, and never from a pull request — a PR
+    # from a fork would otherwise be able to publish to production.
+    needs: quality
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Lets GitHub show the live URL on the deployment, and gives somewhere to
+    # attach a required reviewer later if this should stop being automatic.
+    environment:
+      name: production
+      url: https://watchlater.moviesils.workers.dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `npm run build` also runs `wrangler types --check`, which needs
+      # credentials and is a local development aid. CI only needs the artifact.
+      - name: Build
+        run: npx vite build
+
+      - name: Deploy
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # No `command:` — the action's default `deploy` picks up wrangler.jsonc.
+          # Runtime secrets (TMDB, database, Google OAuth) already live in
+          # Cloudflare and are deliberately not managed from here.
+          packageManager: npm
