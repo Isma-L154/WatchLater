@@ -3,37 +3,49 @@ import { expect, test } from '@playwright/test';
 /**
  * Smoke tests driving the real app. They run signed out, which is the only
  * state reachable without completing a live Google OAuth round-trip — so they
- * cover discovery and the auth gate, while the watchlist logic itself is
- * covered by the unit tests over `$lib`.
+ * cover discovery, navigation and the auth gate, while the watchlist logic
+ * itself is covered by the unit tests over `$lib`.
  */
 
-test('shows the app and reveals a results section when searching', async ({ page }) => {
+test('shows Discover and switches to results when searching', async ({ page }) => {
 	await page.goto('/');
 
-	// The app header renders.
-	await expect(page.getByRole('heading', { name: /watchlater/i })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Discover', level: 1 })).toBeVisible();
 
-	// The search box is present and usable.
-	const search = page.getByPlaceholder(/search for a movie or tv show/i);
+	const search = page.getByPlaceholder(/search movies and tv shows/i);
 	await expect(search).toBeVisible();
 
-	// Typing a query switches the discover section to "Search results".
+	// Typing a query switches the section heading from trending to results.
 	await search.fill('Matrix');
 	await expect(page.getByRole('heading', { name: 'Search results' })).toBeVisible();
 });
 
-test('has an empty or populated watchlist section', async ({ page }) => {
+test('navigates between Discover and My List', async ({ page }) => {
 	await page.goto('/');
-	await expect(page.getByRole('heading', { name: 'Your Watchlist' })).toBeVisible();
+
+	// Two top-level destinations, reachable from anywhere in the app.
+	await page
+		.getByRole('link', { name: /my list/i })
+		.first()
+		.click();
+	await expect(page).toHaveURL(/\/watchlist$/);
+	await expect(page.getByRole('heading', { name: 'My List', level: 1 })).toBeVisible();
+
+	await page
+		.getByRole('link', { name: /discover/i })
+		.first()
+		.click();
+	await expect(page).toHaveURL(/\/$/);
 });
 
 test('gates the watchlist behind sign-in when signed out', async ({ page }) => {
-	await page.goto('/');
+	await page.goto('/watchlist');
 
 	// The list is not shown to anonymous visitors — they get the sign-in prompt.
 	await expect(page.getByText('Your list, and only yours')).toBeVisible();
 
 	// Discover cards offer sign-in rather than a save button that cannot work.
+	await page.goto('/');
 	await expect(page.getByRole('link', { name: /sign in to save/i }).first()).toBeVisible();
 });
 

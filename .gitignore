@@ -24,7 +24,7 @@ vite.config.ts.timestamp-*
 # SQLite
 *.db
 
-# Claude Code (personal, machine-specific settings)
-.claude/settings.local.json
+# Claude Code (local tooling: settings, skills, agents — not project source)
+.claude/
 # Playwright
 test-results

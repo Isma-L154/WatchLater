@@ -88,8 +88,12 @@ export const watchlistItem = sqliteTable(
 		 *
 		 * A single counter is enough because series are watched in order, so
 		 * progress is one-dimensional — no join table, no extra query on the list.
-		 * `totalSeasons` is TMDB's count, snapshotted on save; it stays null for
-		 * movies, which is what marks an entry as not season-trackable.
+		 *
+		 * `totalSeasons` is TMDB's count, snapshotted on save. Three states, all
+		 * meaningful: a positive number is the real count, null means "not known
+		 * yet" (every movie, plus any show still awaiting the read-path backfill),
+		 * and 0 is the sentinel for "TMDB has no season data for this title" —
+		 * which stops that backfill retrying forever. See `NO_SEASON_DATA`.
 		 */
 		seasonsSeen: integer('seasons_seen').notNull().default(0),
 		totalSeasons: integer('total_seasons'),

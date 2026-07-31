@@ -1,39 +1,40 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
-	import { fade } from 'svelte/transition';
-	import { flip } from 'svelte/animate';
+	import { resolve } from '$app/paths';
 	import type { SubmitFunction } from '@sveltejs/kit';
-	import AppHeader from '$lib/components/ui/AppHeader.svelte';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import SearchBar from '$lib/components/ui/SearchBar.svelte';
+	import EmptyState from '$lib/components/ui/EmptyState.svelte';
+	import PosterGrid from '$lib/components/media/PosterGrid.svelte';
+	import PosterGridSkeleton from '$lib/components/media/PosterGridSkeleton.svelte';
 	import DiscoverCard from '$lib/components/media/DiscoverCard.svelte';
-	import WatchlistCard from '$lib/components/media/WatchlistCard.svelte';
-	import WatchlistToolbar from '$lib/components/media/WatchlistToolbar.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import { applyWatchlistView, countByStatus } from '$lib/domain/watchlist';
-	import type { MediaType, SavedEntry } from '$lib/types';
+	import type { MediaType } from '$lib/types';
 	import type { PageData } from './$types';
 
+	/**
+	 * Discover — finding something to watch.
+	 *
+	 * This page used to also carry the watchlist, stacked underneath trending and
+	 * search results. That put the list one full scroll below the fold on every
+	 * visit, which is the wrong end of the app to bury: browsing is occasional,
+	 * "what am I watching?" is the daily question. The list now has its own route
+	 * and its own tab; this page does one job.
+	 */
 	let { data }: { data: PageData } = $props();
 
-	// Shared responsive grid layout for every poster grid on the page.
-	const gridClass = 'grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5';
-
-	const signedIn = $derived(Boolean(data.user));
-
+	const signedIn = $derived(Boolean(page.data.user));
 	const search = new MediaSearch();
 
-	// --- Watchlist view state (strings, to pair with SegmentedControl) ---
-	let statusTab = $state('all');
-	let typeFilter = $state('all');
-	let sortBy = $state('recent');
-	let listQuery = $state('');
-
-	// --- Detail modal ---
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
+
+	const selectedSaved = $derived(
+		selected ? (data.saved[`${selected.tmdbId}:${selected.mediaType}`] ?? null) : null
+	);
 
 	/**
 	 * Surface the outcome of the OAuth round-trip, which comes back as a query
@@ -49,42 +50,9 @@
 		replaceState(page.url.pathname, page.state);
 	});
 
-	// --- Derived views over the saved list ---
-	const savedKeys = $derived(new Set(data.items.map((i) => key(i.tmdbId, i.mediaType))));
-
-	// "<tmdbId>:<mediaType>" -> saved row, so the modal can render the same
-	// controls as the card without issuing a second query.
-	const savedEntries = $derived(
-		new Map<string, SavedEntry>(
-			data.items.map((i) => [
-				key(i.tmdbId, i.mediaType),
-				{ id: i.id, watched: i.watched, seasonsSeen: i.seasonsSeen, totalSeasons: i.totalSeasons }
-			])
-		)
-	);
-
-	const selectedSaved = $derived(
-		selected ? (savedEntries.get(key(selected.tmdbId, selected.mediaType)) ?? null) : null
-	);
-
-	const counts = $derived(countByStatus(data.items));
-
-	const visibleItems = $derived(
-		applyWatchlistView(data.items, {
-			status: statusTab,
-			type: typeFilter,
-			sort: sortBy,
-			query: listQuery
-		})
-	);
-
-	function key(tmdbId: number, mediaType: string): string {
-		return `${tmdbId}:${mediaType}`;
-	}
-
 	/**
-	 * Progressive-enhancement helper: after the action completes it refreshes
-	 * the page data and shows a toast reflecting the outcome.
+	 * Progressive-enhancement helper: after the action completes it refreshes the
+	 * page data and shows a toast reflecting the outcome.
 	 */
 	function withToast(message: string, type: 'success' | 'info' = 'success'): SubmitFunction {
 		return () =>
@@ -95,179 +63,122 @@
 			};
 	}
 
-	/**
-	 * Season updates take their message from the server's response rather than
-	 * from the pre-click state: the action may have discovered a newly aired
-	 * season, so only it knows whether the show is actually finished.
-	 */
-	function seasonProgressToast(title: string): SubmitFunction {
-		return () =>
-			async ({ result, update }) => {
-				await update();
-				if (result.type !== 'success') {
-					if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
-					return;
-				}
-				const payload = result.data as { seasonsSeen?: number; totalSeasons?: number } | undefined;
-				const finished =
-					!!payload?.totalSeasons && (payload.seasonsSeen ?? 0) >= payload.totalSeasons;
-				toasts.add(finished ? `Finished “${title}” 🎉` : `Progress saved for “${title}”`);
-			};
+	function saveKey(tmdbId: number, mediaType: string): string {
+		return `${tmdbId}:${mediaType}`;
 	}
 </script>
 
 <svelte:head>
-	<title>WatchLater — Your movie & TV watchlist</title>
+	<title>Discover — WatchLater</title>
 	<meta
 		name="description"
-		content="Discover movies and TV shows and save them to your personal watch-later list."
+		content="Search movies and TV shows, see what's trending this week, and save titles to your personal watch-later list."
 	/>
 </svelte:head>
 
-<!-- Loading placeholders shown while a search is in flight. -->
-{#snippet skeletonGrid()}
-	<div class={gridClass}>
-		{#each [...Array(10).keys()] as i (i)}
-			<div class="animate-pulse overflow-hidden rounded-2xl bg-slate-800/50 ring-1 ring-white/5">
-				<div class="aspect-[2/3] w-full bg-slate-700/40"></div>
-				<div class="space-y-2 p-3">
-					<div class="h-3 w-3/4 rounded bg-slate-700/40"></div>
-					<div class="h-2 w-1/3 rounded bg-slate-700/40"></div>
-				</div>
-			</div>
-		{/each}
+<div class="py-5 sm:py-8">
+	<h1 class="font-display text-2xl font-extrabold sm:text-3xl">Discover</h1>
+	<p class="mt-1 text-sm text-ink-muted">Find something worth your evening.</p>
+
+	<div class="mt-5">
+		<SearchBar {search} />
 	</div>
-{/snippet}
 
-{#snippet emptyState(icon: string, title: string, hint?: string)}
-	<div class="rounded-2xl border border-dashed border-white/10 px-6 py-12 text-center">
-		<p class="text-4xl">{icon}</p>
-		<p class="mt-3 font-medium text-slate-300">{title}</p>
-		{#if hint}<p class="mt-1 text-sm text-slate-500">{hint}</p>{/if}
-	</div>
-{/snippet}
-
-<div class="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-20 sm:px-6">
-	<AppHeader user={data.user} authAvailable={data.authAvailable} />
-
-	<SearchBar {search} />
-
-	<!-- Discover: search results, or trending when the box is empty -->
-	<section class="mt-6">
+	<section class="mt-7">
 		{#if search.error}
-			<p class="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-300">{search.error}</p>
+			<p
+				class="flex items-center gap-2 rounded-xl bg-rose/10 px-4 py-3 text-sm text-rose ring-1 ring-rose/20"
+			>
+				<Icon name="alert" size={16} />
+				{search.error}
+			</p>
 		{:else if search.active}
-			<div class="mb-3 flex items-baseline justify-between">
-				<h2 class="text-sm font-semibold tracking-wide text-slate-400 uppercase">Search results</h2>
+			<div class="mb-3 flex items-baseline justify-between gap-3">
+				<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Search results</h2>
 				{#if !search.loading && search.results.length > 0}
-					<span class="text-xs text-slate-500">{search.results.length} found</span>
+					<span class="text-xs text-ink-faint">{search.results.length} found</span>
 				{/if}
 			</div>
 
 			{#if search.loading && search.results.length === 0}
-				{@render skeletonGrid()}
+				<PosterGridSkeleton />
 			{:else if search.results.length > 0}
-				<div class={gridClass}>
-					{#each search.results as item (key(item.tmdbId, item.mediaType))}
+				<PosterGrid>
+					{#each search.results as item (saveKey(item.tmdbId, item.mediaType))}
 						<DiscoverCard
 							{item}
 							{signedIn}
-							saved={savedKeys.has(key(item.tmdbId, item.mediaType))}
+							saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
 							onSelect={() => (selected = item)}
 							onSubmit={withToast(`Added “${item.title}”`)}
 						/>
 					{/each}
-				</div>
+				</PosterGrid>
 			{:else}
-				{@render emptyState('🤷', `No results for “${search.query}”.`)}
+				<EmptyState
+					icon="search"
+					title={`No results for “${search.query}”`}
+					hint="Try a shorter title, or check the spelling."
+				/>
 			{/if}
 		{:else if data.trending.length > 0}
-			<h2 class="mb-3 text-sm font-semibold tracking-wide text-slate-400 uppercase">
-				🔥 Trending this week
-			</h2>
-			<div class={gridClass}>
-				{#each data.trending as item (key(item.tmdbId, item.mediaType))}
+			<div class="mb-3 flex items-center gap-2">
+				<Icon name="flame" size={16} class="text-amber" />
+				<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Trending this week</h2>
+			</div>
+			<PosterGrid>
+				{#each data.trending as item (saveKey(item.tmdbId, item.mediaType))}
 					<DiscoverCard
 						{item}
 						{signedIn}
-						saved={savedKeys.has(key(item.tmdbId, item.mediaType))}
+						saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
 						onSelect={() => (selected = item)}
 						onSubmit={withToast(`Added “${item.title}”`)}
 					/>
 				{/each}
-			</div>
-		{/if}
-	</section>
-
-	<div class="my-8 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
-
-	<!-- The list itself -->
-	<section>
-		<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<h2 class="shrink-0 text-lg font-bold whitespace-nowrap text-slate-100">Your Watchlist</h2>
-			{#if signedIn && counts.all > 0}
-				<WatchlistToolbar
-					{counts}
-					bind:status={statusTab}
-					bind:type={typeFilter}
-					bind:sort={sortBy}
-					bind:query={listQuery}
-				/>
-			{/if}
-		</div>
-
-		{#if !signedIn}
-			<!-- Signed-out state. Browsing stays open; the list itself is private. -->
-			<div
-				class="rounded-2xl border border-white/10 bg-slate-900/40 px-6 py-14 text-center sm:py-16"
-			>
-				<p class="text-5xl">🔐</p>
-				<p class="mt-4 text-lg font-semibold text-slate-100">Your list, and only yours</p>
-				<p class="mx-auto mt-2 max-w-sm text-sm text-slate-400">
-					Sign in with Google to save titles. Your watchlist stays tied to your account — nobody
-					else can see or change it.
-				</p>
-				{#if data.authAvailable}
-					<div class="mx-auto mt-6 max-w-xs"><GoogleButton size="full" /></div>
-				{:else}
-					<p class="mt-6 text-xs text-amber-300/80">
-						Sign-in is not configured on this deployment yet.
-					</p>
-				{/if}
-			</div>
-		{:else if counts.all === 0}
-			{@render emptyState(
-				'🍿',
-				'Your watchlist is empty',
-				'Search or pick something trending above to get started.'
-			)}
-		{:else if visibleItems.length === 0}
-			{@render emptyState(
-				'🔎',
-				listQuery.trim()
-					? `No matches for “${listQuery}” in your list.`
-					: 'Nothing here with the current filters.'
-			)}
+			</PosterGrid>
 		{:else}
-			<div class={gridClass}>
-				{#each visibleItems as item (item.id)}
-					<div
-						animate:flip={{ duration: 250 }}
-						in:fade={{ duration: 200 }}
-						out:fade={{ duration: 150 }}
-					>
-						<WatchlistCard
-							{item}
-							onSelect={() => (selected = item)}
-							onToggle={withToast(item.watched ? 'Moved back to your list' : 'Marked as watched')}
-							onSetSeasons={seasonProgressToast(item.title)}
-							onRemove={withToast(`Removed “${item.title}”`, 'info')}
-						/>
-					</div>
-				{/each}
-			</div>
+			<EmptyState
+				icon="alert"
+				title="Trending is unavailable right now"
+				hint="Search for a title above — that still works."
+			/>
 		{/if}
 	</section>
+
+	<!-- Signed-out prompt sits *after* the content, not in front of it: browsing
+	     is open to everyone, and only saving needs an account. -->
+	{#if !signedIn && page.data.authAvailable}
+		<section
+			class="mt-10 flex flex-col items-center gap-4 rounded-2xl bg-surface/60 px-6 py-8 text-center ring-1 ring-line sm:flex-row sm:justify-between sm:text-left"
+		>
+			<div class="flex items-center gap-3">
+				<span
+					class="hidden h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-brand/15 text-brand-hi sm:flex"
+				>
+					<Icon name="bookmark" size={20} />
+				</span>
+				<div>
+					<p class="font-display font-semibold text-ink">Keep track of what you find</p>
+					<p class="mt-0.5 text-sm text-ink-muted">
+						Sign in to build a watchlist that's yours alone.
+					</p>
+				</div>
+			</div>
+			<div class="w-full max-w-xs sm:w-auto"><GoogleButton size="full" /></div>
+		</section>
+	{:else if signedIn}
+		<div class="mt-10 flex justify-center">
+			<a
+				href={resolve('/watchlist')}
+				class="flex items-center gap-2 rounded-xl bg-surface px-5 py-2.5 text-sm font-semibold text-ink-muted ring-1 ring-line transition-colors duration-200 hover:bg-surface-hi hover:text-ink"
+			>
+				<Icon name="bookmark" size={16} />
+				Go to my list
+				<Icon name="chevronRight" size={15} />
+			</a>
+		</div>
+	{/if}
 </div>
 
 {#if selected}

@@ -2,8 +2,13 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<meta name="text-scale" content="scale" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+		<!-- Matches --color-canvas, so the mobile browser chrome blends into the app
+		     instead of framing it with a white bar. -->
+		<meta name="theme-color" content="#07070e" />
+		<!-- Poster and profile images all come from this one host; warming the
+		     connection removes a DNS + TLS round-trip from the first grid render. -->
+		<link rel="preconnect" href="https://image.tmdb.org" crossorigin />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

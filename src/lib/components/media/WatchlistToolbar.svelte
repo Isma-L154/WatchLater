@@ -1,7 +1,16 @@
 <script lang="ts">
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import SegmentedControl from '$lib/components/ui/SegmentedControl.svelte';
 	import type { countByStatus } from '$lib/domain/watchlist';
 
+	/**
+	 * Filters for the saved list.
+	 *
+	 * Laid out in three stacked rows rather than one wrapping line: on a phone the
+	 * old single row wrapped into an unpredictable shape that moved as counts
+	 * changed. Rows keep the controls in the same place regardless of how many
+	 * status tabs happen to exist.
+	 */
 	interface Props {
 		counts: ReturnType<typeof countByStatus>;
 		status: string;
@@ -22,7 +31,7 @@
 	// something they would show — an empty tab is just noise on a phone.
 	const statusOptions = $derived([
 		{ value: 'all', label: 'All', count: counts.all },
-		{ value: 'toWatch', label: 'To Watch', count: counts.toWatch },
+		{ value: 'toWatch', label: 'To watch', count: counts.toWatch },
 		...(counts.inProgress > 0
 			? [{ value: 'inProgress', label: 'Watching', count: counts.inProgress }]
 			: []),
@@ -33,40 +42,56 @@
 	]);
 </script>
 
-<div class="flex flex-wrap items-center gap-2">
-	<label class="relative">
-		<span class="sr-only">Filter your watchlist</span>
+<div class="space-y-2.5">
+	<label class="relative block">
+		<span class="sr-only">Filter your watchlist by title</span>
+		<span
+			class="pointer-events-none absolute top-1/2 left-3.5 -translate-y-1/2 text-ink-faint"
+			aria-hidden="true"
+		>
+			<Icon name="filter" size={15} />
+		</span>
 		<input
 			type="search"
 			bind:value={query}
 			placeholder="Filter your list…"
 			autocomplete="off"
-			class="w-full rounded-xl border border-white/10 bg-slate-800/70 py-1.5 pr-3 pl-3 text-xs text-slate-100 placeholder:text-slate-500 focus:border-sky-500 focus:ring-2 focus:ring-sky-500/30 focus:outline-none sm:w-44 sm:text-sm"
+			class="w-full rounded-xl border border-line bg-surface py-2.5 pr-3 pl-10 text-base text-ink transition-colors duration-200 placeholder:text-ink-faint focus:border-brand sm:max-w-xs sm:text-sm"
 		/>
 	</label>
 
-	<SegmentedControl bind:value={status} options={statusOptions} />
-	<SegmentedControl
-		bind:value={type}
-		options={[
-			{ value: 'all', label: 'All' },
-			{ value: 'movie', label: 'Movies' },
-			{ value: 'tv', label: 'TV' }
-		]}
-	/>
+	<SegmentedControl bind:value={status} options={statusOptions} label="Filter by status" />
 
-	<label class="relative">
-		<span class="sr-only">Sort watchlist</span>
-		<select
-			bind:value={sort}
-			class="cursor-pointer rounded-xl bg-slate-800/70 py-1.5 pr-8 pl-3 text-xs font-semibold text-slate-300 ring-1 ring-white/5 focus:ring-2 focus:ring-sky-500/40 focus:outline-none sm:text-sm"
-		>
-			<option value="recent">Recently added</option>
-			<option value="rating">Top rated</option>
-			<option value="title">A–Z</option>
-			{#if counts.upcoming > 0}
-				<option value="soonest">Releasing soonest</option>
-			{/if}
-		</select>
-	</label>
+	<div class="flex flex-wrap items-center gap-2">
+		<SegmentedControl
+			bind:value={type}
+			label="Filter by media type"
+			options={[
+				{ value: 'all', label: 'All' },
+				{ value: 'movie', label: 'Movies' },
+				{ value: 'tv', label: 'TV' }
+			]}
+		/>
+
+		<label class="relative">
+			<span class="sr-only">Sort watchlist</span>
+			<select
+				bind:value={sort}
+				class="cursor-pointer appearance-none rounded-xl bg-surface py-2 pr-8 pl-3 text-xs font-semibold text-ink-muted ring-1 ring-line transition-colors duration-200 hover:text-ink sm:text-sm"
+			>
+				<option value="recent">Recently added</option>
+				<option value="rating">Top rated</option>
+				<option value="title">A–Z</option>
+				{#if counts.upcoming > 0}
+					<option value="soonest">Releasing soonest</option>
+				{/if}
+			</select>
+			<span
+				class="pointer-events-none absolute top-1/2 right-2.5 -translate-y-1/2 rotate-90 text-ink-faint"
+				aria-hidden="true"
+			>
+				<Icon name="chevronRight" size={13} />
+			</span>
+		</label>
+	</div>
 </div>

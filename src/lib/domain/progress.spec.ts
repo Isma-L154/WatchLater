@@ -33,6 +33,15 @@ describe('isTrackable', () => {
 	it('does not track single-season shows — a 0-to-1 stepper is just friction', () => {
 		expect(isTrackable(show({ totalSeasons: 1 }))).toBe(false);
 	});
+
+	// 0 is the `NO_SEASON_DATA` sentinel the backfill writes when TMDB answered
+	// but had nothing usable. It must behave exactly like "not trackable", not
+	// like a zero-season show.
+	it('does not track shows marked as having no season data', () => {
+		expect(isTrackable(show({ totalSeasons: 0 }))).toBe(false);
+		expect(getSeasonProgress(show({ totalSeasons: 0 })).trackable).toBe(false);
+		expect(deriveWatched(0, 0)).toBe(false);
+	});
 });
 
 describe('getSeasonProgress', () => {
