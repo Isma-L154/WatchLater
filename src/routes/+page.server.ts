@@ -22,9 +22,15 @@ export const load: PageServerLoad = async ({ locals }) => {
 /**
  * The list as a lookup keyed by `"<tmdbId>:<mediaType>"`.
  *
- * Built on the server so the browser receives a ready-to-use index instead of
- * rebuilding it on every render, and so a large list costs one small payload
- * rather than the whole watchlist a second time.
+ * Built on the server so the browser receives a ready-to-use index rather than
+ * rebuilding it on every render. Every saved title has to be in it — search runs
+ * client-side, so there is no way to know up front which ids a visitor will need
+ * an answer for.
+ *
+ * That means the payload grows with the list, so it carries the six columns the
+ * badge and the detail sheet actually read and nothing else: no overview, no
+ * poster path, no timestamps. At a realistic couple of hundred titles that is a
+ * few KB.
  */
 async function loadSavedIndex(userId: string | undefined): Promise<Record<string, SavedEntry>> {
 	if (!userId) return {};

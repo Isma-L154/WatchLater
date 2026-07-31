@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { fade, fly } from 'svelte/transition';
 	import { enhance } from '$app/forms';
 	import type { SubmitFunction } from '@sveltejs/kit';
@@ -34,19 +35,38 @@
 	});
 
 	/**
-	 * Modal plumbing: lock background scroll, close on Escape, and keep keyboard
-	 * focus inside the dialog.
+	 * Open/close side effects: lock the background scroll and hand focus back to
+	 * whatever opened the sheet.
 	 *
-	 * Without the focus trap, tabbing walks straight out of the dialog and into
-	 * the page behind it — which is still there, still interactive, and now
-	 * invisible to a screen-reader user who has no way of knowing they left.
+	 * Deliberately reads nothing reactive — `dialog` is untracked — so it runs
+	 * exactly once per mount. Folding this together with the key handler below
+	 * would tie it to `onClose`, which is an inline arrow in the parent and so
+	 * gets a fresh identity on every re-render; a single form action would then
+	 * tear the effect down mid-session, bounce focus, and re-capture
+	 * `previouslyFocused` as the dialog itself — leaving the final close to
+	 * restore focus to a node that no longer exists.
 	 */
 	$effect(() => {
 		const previousOverflow = document.body.style.overflow;
 		const previouslyFocused = document.activeElement as HTMLElement | null;
-		document.body.style.overflow = 'hidden';
-		dialog?.focus();
 
+		document.body.style.overflow = 'hidden';
+		untrack(() => dialog)?.focus();
+
+		return () => {
+			document.body.style.overflow = previousOverflow;
+			previouslyFocused?.focus();
+		};
+	});
+
+	/**
+	 * Escape to close, and a focus trap for Tab.
+	 *
+	 * Without the trap, tabbing walks straight out of the dialog and into the page
+	 * behind it — which is still there, still interactive, and now invisible to a
+	 * screen-reader user who has no way of knowing they left.
+	 */
+	$effect(() => {
 		const onKey = (event: KeyboardEvent) => {
 			if (event.key === 'Escape') {
 				onClose();
@@ -54,9 +74,13 @@
 			}
 			if (event.key !== 'Tab' || !dialog) return;
 
-			const focusable = dialog.querySelectorAll<HTMLElement>(
-				'a[href], button:not([disabled]), input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])'
-			);
+			// Queried per keypress rather than cached: the sheet's focusable set
+			// changes as it loads, and as the trailer and save/remove controls swap.
+			const focusable = [
+				...dialog.querySelectorAll<HTMLElement>(
+					'a[href], button:not([disabled]), input, select, textarea, iframe, [tabindex]:not([tabindex="-1"])'
+				)
+			].filter((element) => element.offsetParent !== null || element === document.activeElement);
 			if (focusable.length === 0) return;
 
 			const first = focusable[0];
@@ -71,11 +95,7 @@
 		};
 
 		window.addEventListener('keydown', onKey);
-		return () => {
-			document.body.style.overflow = previousOverflow;
-			window.removeEventListener('keydown', onKey);
-			previouslyFocused?.focus();
-		};
+		return () => window.removeEventListener('keydown', onKey);
 	});
 
 	async function loadDetails(id: number, type: MediaType) {
