@@ -30,6 +30,15 @@
 	const signedIn = $derived(Boolean(page.data.user));
 	const search = new MediaSearch();
 
+	/**
+	 * How many posters load eagerly at full priority.
+	 *
+	 * Covers the widest first row (5 columns at `lg`) with one to spare. Beyond
+	 * that, eager loading stops helping and starts competing with the LCP image
+	 * for bandwidth, so the rest stay lazy.
+	 */
+	const EAGER_POSTERS = 6;
+
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
 
 	const selectedSaved = $derived(
@@ -104,10 +113,11 @@
 				<PosterGridSkeleton />
 			{:else if search.results.length > 0}
 				<PosterGrid>
-					{#each search.results as item (saveKey(item.tmdbId, item.mediaType))}
+					{#each search.results as item, index (saveKey(item.tmdbId, item.mediaType))}
 						<DiscoverCard
 							{item}
 							{signedIn}
+							priority={index < EAGER_POSTERS}
 							saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
 							onSelect={() => (selected = item)}
 							onSubmit={withToast(`Added “${item.title}”`)}
@@ -127,10 +137,11 @@
 				<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Trending this week</h2>
 			</div>
 			<PosterGrid>
-				{#each data.trending as item (saveKey(item.tmdbId, item.mediaType))}
+				{#each data.trending as item, index (saveKey(item.tmdbId, item.mediaType))}
 					<DiscoverCard
 						{item}
 						{signedIn}
+						priority={index < EAGER_POSTERS}
 						saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
 						onSelect={() => (selected = item)}
 						onSubmit={withToast(`Added “${item.title}”`)}

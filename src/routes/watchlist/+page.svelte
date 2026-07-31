@@ -29,6 +29,13 @@
 
 	const signedIn = $derived(Boolean(page.data.user));
 
+	/**
+	 * How many posters load eagerly at full priority — see the same constant on
+	 * Discover. Lazy-loading the tile that turns out to be the LCP element costs
+	 * measurable paint time, and the first row is never below the fold.
+	 */
+	const EAGER_POSTERS = 6;
+
 	// --- View state (strings, to pair with SegmentedControl) ---
 	let statusTab = $state('all');
 	let typeFilter = $state('all');
@@ -220,7 +227,7 @@
 				</p>
 			{/if}
 			<PosterGrid>
-				{#each visibleItems as item (item.id)}
+				{#each visibleItems as item, index (item.id)}
 					<div
 						animate:flip={{ duration: 250 }}
 						in:fade={{ duration: 200 }}
@@ -228,6 +235,7 @@
 					>
 						<WatchlistCard
 							{item}
+							priority={index < EAGER_POSTERS}
 							onSelect={() => (selected = item)}
 							onToggle={withToast(item.watched ? 'Moved back to your list' : 'Marked as watched')}
 							onSetSeasons={seasonProgressToast(item)}

@@ -18,11 +18,13 @@
 		/** The saved row when this title is already on the list, otherwise null. */
 		saved: SavedEntry | null;
 		signedIn: boolean;
+		/** Forwarded to the poster; set for the tiles above the fold. */
+		priority?: boolean;
 		onSelect: () => void;
 		onSubmit: SubmitFunction;
 	}
 
-	let { item, saved, signedIn, onSelect, onSubmit }: Props = $props();
+	let { item, saved, signedIn, priority = false, onSelect, onSubmit }: Props = $props();
 
 	/**
 	 * A show already in progress shouldn't just say "in your list" here — the
@@ -44,6 +46,7 @@
 	mediaType={item.mediaType}
 	watched={saved?.watched ?? false}
 	{note}
+	{priority}
 	{onSelect}
 >
 	{#snippet actions()}

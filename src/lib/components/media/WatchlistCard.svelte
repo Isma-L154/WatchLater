@@ -16,13 +16,15 @@
 	 */
 	interface Props {
 		item: WatchlistItem;
+		/** Forwarded to the poster; set for the tiles above the fold. */
+		priority?: boolean;
 		onSelect: () => void;
 		onToggle: SubmitFunction;
 		onSetSeasons: SubmitFunction;
 		onRemove: SubmitFunction;
 	}
 
-	let { item, onSelect, onToggle, onSetSeasons, onRemove }: Props = $props();
+	let { item, priority = false, onSelect, onToggle, onSetSeasons, onRemove }: Props = $props();
 
 	const progress = $derived(getSeasonProgress(item));
 
@@ -39,6 +41,7 @@
 	mediaType={item.mediaType}
 	watched={item.watched}
 	note={progress.trackable ? progress.label : undefined}
+	{priority}
 	{onSelect}
 >
 	{#snippet actions()}
