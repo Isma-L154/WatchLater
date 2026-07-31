@@ -34,11 +34,16 @@
 	--color-surface-hi: #1a1a2e;
 	--color-line: #262639;
 
-	/* Text, in descending emphasis. `faint` is the floor — anything lighter
-	   drops under the 4.5:1 contrast minimum against `--color-surface`. */
+	/* Text, in descending emphasis.
+
+	   `faint` is the floor, and the constraint is the *lightest* surface it can
+	   land on (`surface-hi`), not the canvas — measured contrast against the
+	   three backgrounds is 5.97 / 5.55 / 5.07, all clear of the 4.5:1 WCAG AA
+	   minimum. Darkening it any further fails on cards, which is what the
+	   previous #7a7a93 did at 4.47 and 4.09. */
 	--color-ink: #f5f5fa;
 	--color-ink-muted: #a5a5bd;
-	--color-ink-faint: #7a7a93;
+	--color-ink-faint: #8a8aa3;
 
 	/* Brand: primary actions, active navigation, selection. */
 	--color-brand: #6366f1;
