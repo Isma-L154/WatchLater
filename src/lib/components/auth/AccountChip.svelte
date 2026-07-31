@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import type { SessionUser } from '$lib/types';
 
 	interface Props {
@@ -12,9 +13,9 @@
 	let avatarFailed = $state(false);
 </script>
 
-<div class="flex items-center gap-2">
+<div class="flex items-center gap-1.5">
 	<div
-		class="flex items-center gap-2 rounded-full bg-white/5 py-1 pr-1 pl-1 ring-1 ring-white/10 sm:pr-3"
+		class="flex items-center gap-2 rounded-full bg-surface p-1 ring-1 ring-line sm:pr-3"
 		title={user.email}
 	>
 		{#if user.avatarUrl && !avatarFailed}
@@ -29,12 +30,12 @@
 			/>
 		{:else}
 			<span
-				class="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/20 text-xs font-bold text-sky-300"
+				class="flex h-7 w-7 items-center justify-center rounded-full bg-brand/20 text-xs font-bold text-brand-hi"
 			>
 				{initial}
 			</span>
 		{/if}
-		<span class="hidden max-w-[10rem] truncate text-sm font-medium text-slate-200 sm:block">
+		<span class="hidden max-w-[9rem] truncate text-sm font-medium text-ink sm:block">
 			{user.name}
 		</span>
 	</div>
@@ -43,11 +44,11 @@
 	<form method="POST" action="/auth/logout">
 		<button
 			type="submit"
-			class="rounded-full p-2 text-slate-400 transition hover:bg-white/5 hover:text-slate-200 sm:px-3 sm:py-1.5 sm:text-xs sm:font-semibold"
 			aria-label="Sign out"
+			title="Sign out"
+			class="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-ink-faint transition-colors duration-200 hover:bg-surface-hi hover:text-ink"
 		>
-			<span class="hidden sm:inline">Sign out</span>
-			<span class="sm:hidden" aria-hidden="true">⏻</span>
+			<Icon name="logout" size={16} />
 		</button>
 	</form>
 </div>

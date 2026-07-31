@@ -2,8 +2,10 @@
 	import { enhance } from '$app/forms';
 	import { resolve } from '$app/paths';
 	import type { SubmitFunction } from '@sveltejs/kit';
+	import Icon from '$lib/components/ui/Icon.svelte';
 	import MediaCard from './MediaCard.svelte';
-	import type { MediaResult } from '$lib/types';
+	import { getSeasonProgress } from '$lib/domain/progress';
+	import type { MediaResult, SavedEntry } from '$lib/types';
 
 	/**
 	 * A discoverable title (trending or search result) with its save control.
@@ -13,13 +15,25 @@
 	 */
 	interface Props {
 		item: MediaResult;
-		saved: boolean;
+		/** The saved row when this title is already on the list, otherwise null. */
+		saved: SavedEntry | null;
 		signedIn: boolean;
 		onSelect: () => void;
 		onSubmit: SubmitFunction;
 	}
 
 	let { item, saved, signedIn, onSelect, onSubmit }: Props = $props();
+
+	/**
+	 * A show already in progress shouldn't just say "in your list" here — the
+	 * useful fact is how far in you are, so Discover stays honest about state you
+	 * already have rather than making you switch tabs to find out.
+	 */
+	const note = $derived.by(() => {
+		if (!saved) return undefined;
+		const progress = getSeasonProgress({ ...saved, mediaType: item.mediaType });
+		return progress.trackable && progress.state !== 'notStarted' ? progress.label : undefined;
+	});
 </script>
 
 <MediaCard
@@ -28,6 +42,8 @@
 	releaseDate={item.releaseDate}
 	voteAverage={item.voteAverage}
 	mediaType={item.mediaType}
+	watched={saved?.watched ?? false}
+	{note}
 	{onSelect}
 >
 	{#snippet actions()}
@@ -35,15 +51,15 @@
 			<a
 				href={resolve('/auth/google')}
 				data-sveltekit-reload
-				class="block w-full rounded-lg bg-white/5 py-2 text-center text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white"
+				class="flex min-h-[38px] w-full items-center justify-center rounded-xl bg-surface-hi text-xs font-semibold text-ink-muted ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line hover:text-ink"
 			>
 				Sign in to save
 			</a>
 		{:else if saved}
 			<span
-				class="flex items-center justify-center gap-1 rounded-lg bg-emerald-500/15 py-2 text-xs font-semibold text-emerald-400"
+				class="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-xl bg-mint/12 text-xs font-semibold text-mint"
 			>
-				✓ In your list
+				<Icon name="check" size={14} stroke={2.5} /> In your list
 			</span>
 		{:else}
 			<form method="POST" action="?/add" use:enhance={onSubmit}>
@@ -56,9 +72,9 @@
 				<input type="hidden" name="voteAverage" value={item.voteAverage ?? ''} />
 				<button
 					type="submit"
-					class="w-full rounded-lg bg-sky-500 py-2 text-xs font-semibold text-white transition hover:bg-sky-400 active:scale-95"
+					class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-semibold text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-hi active:scale-[0.98]"
 				>
-					+ Watch Later
+					<Icon name="plus" size={14} stroke={2.5} /> Watch Later
 				</button>
 			</form>
 		{/if}

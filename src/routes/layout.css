@@ -1,31 +1,138 @@
 @import 'tailwindcss';
 
+/**
+ * Fonts are self-hosted rather than pulled from Google's CDN.
+ *
+ * A third-party stylesheet in `<head>` is render-blocking on a connection we do
+ * not control, and it hands every visitor's IP to another origin for nothing in
+ * return. Bundled variable fonts ship as two woff2 files from our own domain,
+ * covering every weight the app uses in a fraction of the bytes of separate
+ * static cuts.
+ */
+@import '@fontsource-variable/outfit';
+@import '@fontsource-variable/work-sans';
+
+/**
+ * Design tokens.
+ *
+ * Everything visual is named by *role* rather than by hue — `bg-surface`, not
+ * `bg-slate-900`. The point is that a component never encodes a colour decision:
+ * re-theming the app is a change here, not a sweep through forty files. It also
+ * stops the slow drift into six near-identical greys that a raw palette invites.
+ */
+@theme {
+	/* Typography. Outfit is geometric and slightly condensed, which gives titles
+	   presence at small sizes; Work Sans has the taller x-height that keeps
+	   overviews and metadata readable on a phone. */
+	--font-display: 'Outfit Variable', ui-sans-serif, system-ui, sans-serif;
+	--font-sans: 'Work Sans Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+	/* Surfaces, darkest to lightest. Near-black rather than pure black: posters
+	   are the brightest thing on screen and a true #000 makes them glare. */
+	--color-canvas: #07070e;
+	--color-surface: #111120;
+	--color-surface-hi: #1a1a2e;
+	--color-line: #262639;
+
+	/* Text, in descending emphasis. `faint` is the floor — anything lighter
+	   drops under the 4.5:1 contrast minimum against `--color-surface`. */
+	--color-ink: #f5f5fa;
+	--color-ink-muted: #a5a5bd;
+	--color-ink-faint: #7a7a93;
+
+	/* Brand: primary actions, active navigation, selection. */
+	--color-brand: #6366f1;
+	--color-brand-hi: #818cf8;
+	--color-brand-lo: #4f46e5;
+
+	/* Status. Each one owns exactly one meaning across the whole app:
+	   gold = rating, mint = finished, amber = not released yet,
+	   sky = partially watched, rose = destructive. */
+	--color-gold: #fbbf24;
+	--color-mint: #34d399;
+	--color-amber: #fcd34d;
+	--color-sky: #38bdf8;
+	--color-rose: #fb7185;
+
+	/* Motion. One duration scale so nothing feels out of step. */
+	--ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
 :root {
 	color-scheme: dark;
+	scroll-behavior: smooth;
+	/* Kills the 300ms mobile tap delay without disabling pinch-zoom. */
+	touch-action: manipulation;
+}
+
+html,
+body {
+	min-height: 100dvh;
 }
 
 body {
-	@apply text-slate-100 antialiased;
-	font-family:
-		system-ui,
-		-apple-system,
-		'Segoe UI',
-		Roboto,
-		Helvetica,
-		Arial,
-		sans-serif;
-	min-height: 100dvh;
-	/* Cinematic dark base with soft colored glows in the corners. */
-	background-color: #020617;
+	@apply bg-canvas font-sans text-ink antialiased;
+	/* Cinematic wash: three wide, low-opacity glows anchored off-screen. Fixed
+	   attachment keeps them still while the page scrolls, so they read as
+	   lighting rather than as content. */
 	background-image:
-		radial-gradient(55rem 55rem at 50% -15%, rgba(56, 189, 248, 0.13), transparent 60%),
-		radial-gradient(40rem 40rem at 100% 0%, rgba(129, 140, 248, 0.1), transparent 55%),
-		radial-gradient(45rem 45rem at 0% 20%, rgba(236, 72, 153, 0.06), transparent 55%);
+		radial-gradient(60rem 50rem at 50% -20%, rgba(99, 102, 241, 0.16), transparent 62%),
+		radial-gradient(40rem 40rem at 100% 5%, rgba(56, 189, 248, 0.08), transparent 58%),
+		radial-gradient(45rem 45rem at 0% 25%, rgba(217, 70, 239, 0.06), transparent 58%);
 	background-attachment: fixed;
 }
 
-/* Subtle custom scrollbar to match the dark theme. */
+h1,
+h2,
+h3 {
+	@apply font-display tracking-tight;
+}
+
+/* Every interactive element gets the same focus ring, so keyboard users see one
+   consistent signal instead of the browser default in some places and a custom
+   one in others. `:focus-visible` keeps it off mouse clicks. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+	outline: 2px solid var(--color-brand-hi);
+	outline-offset: 2px;
+	border-radius: 0.5rem;
+}
+
+/* Native search inputs render a platform "clear" cross that clashes with ours. */
+input[type='search']::-webkit-search-cancel-button {
+	display: none;
+}
+
 * {
 	scrollbar-width: thin;
-	scrollbar-color: #334155 transparent;
+	scrollbar-color: var(--color-line) transparent;
+}
+
+/* Horizontal rails hide their scrollbar — the partially visible next card is
+   the affordance, and a bar under it just adds noise on desktop. */
+.no-scrollbar {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+	display: none;
+}
+
+/**
+ * Motion is decoration here, never information: every animated state is also
+ * conveyed by colour, text or position. That makes it safe to switch off
+ * wholesale for anyone who has asked their OS to reduce motion.
+ */
+@media (prefers-reduced-motion: reduce) {
+	:root {
+		scroll-behavior: auto;
+	}
+
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }
