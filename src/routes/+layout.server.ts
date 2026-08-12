@@ -11,10 +11,28 @@ import type { LayoutServerLoad } from './$types';
  * is never loaded. It is a single indexed `count(*)`, not a second fetch of the
  * list.
  */
-export const load: LayoutServerLoad = async ({ locals }) => {
+/**
+ * Which country's streaming offers to show.
+ *
+ * Cloudflare resolves this at the edge and hands it over as a header, so it
+ * costs nothing and needs no permission prompt — unlike the geolocation API,
+ * which would be a wildly disproportionate ask for "which Netflix is yours".
+ *
+ * Falls back to US, which is the country TMDB has the most complete data for.
+ */
+function resolveCountry(request: Request): string {
+	const header = request.headers.get('cf-ipcountry')?.toUpperCase();
+	// `XX` is Cloudflare's marker for an unknown or reserved client, and `T1`
+	// means Tor — neither maps to a real TMDB region.
+	if (!header || header.length !== 2 || header === 'XX' || header === 'T1') return 'US';
+	return header;
+}
+
+export const load: LayoutServerLoad = async ({ locals, request }) => {
 	return {
 		user: locals.user,
 		authAvailable: isGoogleAuthConfigured(),
-		watchlistCount: locals.user ? await countWatchlist(locals.user.id) : 0
+		watchlistCount: locals.user ? await countWatchlist(locals.user.id) : 0,
+		country: resolveCountry(request)
 	};
 };

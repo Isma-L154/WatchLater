@@ -1,5 +1,12 @@
 import { env } from '$env/dynamic/private';
-import type { MediaDetails, MediaResult, MediaType } from '$lib/types';
+import type {
+	MediaDetails,
+	MediaResult,
+	MediaType,
+	UpcomingSeason,
+	WatchOptions,
+	WatchProvider
+} from '$lib/types';
 
 /**
  * Server-only TMDB client. This module lives under `$lib/server`, so SvelteKit
@@ -97,28 +104,145 @@ interface TmdbVideoRaw {
 	type: string;
 	key: string;
 }
+interface TmdbSeasonRaw {
+	season_number: number;
+	air_date?: string | null;
+	episode_count?: number;
+}
+interface TmdbProviderRaw {
+	provider_id: number;
+	provider_name: string;
+	logo_path?: string | null;
+	display_priority?: number;
+}
+interface TmdbProviderCountryRaw {
+	link?: string;
+	flatrate?: TmdbProviderRaw[];
+	free?: TmdbProviderRaw[];
+	ads?: TmdbProviderRaw[];
+	rent?: TmdbProviderRaw[];
+	buy?: TmdbProviderRaw[];
+}
 interface TmdbDetailsRaw extends TmdbRawResult {
 	genres?: TmdbGenre[];
 	runtime?: number;
 	episode_run_time?: number[];
 	tagline?: string;
 	number_of_seasons?: number;
+	seasons?: TmdbSeasonRaw[];
 	status?: string;
 	backdrop_path?: string | null;
 	credits?: { cast?: TmdbCastRaw[] };
 	videos?: { results?: TmdbVideoRaw[] };
+	'watch/providers'?: { results?: Record<string, TmdbProviderCountryRaw> };
+}
+
+/** What the season list tells us once unaired seasons are separated out. */
+export interface SeasonBreakdown {
+	/** Every season TMDB lists, aired or not. */
+	totalSeasons: number | null;
+	/** Seasons that have actually premiered — the ceiling for progress. */
+	airedSeasons: number | null;
+	upcomingSeason: UpcomingSeason | null;
+}
+
+/**
+ * Split a show's seasons into "already premiered" and "still to come".
+ *
+ * TMDB's `number_of_seasons` counts announced seasons, which is what makes a
+ * show with three aired seasons and a fourth dated for next year look fully
+ * watchable today. Season 0 ("Specials") is excluded throughout: it is not part
+ * of the numbered run and counting it would shift every season by one.
+ *
+ * A season with no `air_date` is treated as *not* aired. TMDB leaves the date
+ * empty for seasons that are announced but unscheduled, and guessing "aired"
+ * there would recreate the exact bug this exists to prevent.
+ */
+export function splitSeasons(
+	seasons: TmdbSeasonRaw[] | undefined,
+	now: Date = new Date()
+): SeasonBreakdown {
+	const numbered = (seasons ?? [])
+		.filter((season) => Number.isInteger(season.season_number) && season.season_number >= 1)
+		.sort((a, b) => a.season_number - b.season_number);
+
+	if (numbered.length === 0)
+		return { totalSeasons: null, airedSeasons: null, upcomingSeason: null };
+
+	// Compared as calendar days in UTC, matching `domain/release` — a season that
+	// premieres "on the 12th" is out on the 12th regardless of the viewer's zone.
+	const todayUtc = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+	const hasAired = (season: TmdbSeasonRaw): boolean => {
+		if (!season.air_date) return false;
+		const parsed = Date.parse(`${season.air_date}T00:00:00Z`);
+		return Number.isFinite(parsed) && parsed <= todayUtc;
+	};
+
+	const aired = numbered.filter(hasAired);
+	const next = numbered.find((season) => !hasAired(season));
+
+	return {
+		totalSeasons: numbered.length,
+		airedSeasons: aired.length,
+		upcomingSeason: next ? { number: next.season_number, airDate: next.air_date ?? null } : null
+	};
+}
+
+/**
+ * Normalize TMDB's per-country watch providers.
+ *
+ * "Free with ads" is folded into `free` because the distinction between TMDB's
+ * `free` and `ads` buckets is not one anybody is making when they ask where to
+ * watch something. Providers are ordered by TMDB's `display_priority`, which
+ * reflects how prominent the service is in that country.
+ */
+function normalizeWatchOptions(
+	raw: Record<string, TmdbProviderCountryRaw> | undefined,
+	country: string
+): WatchOptions | null {
+	const entry = raw?.[country];
+	if (!entry) return null;
+
+	const map = (providers: TmdbProviderRaw[] | undefined): WatchProvider[] =>
+		[...(providers ?? [])]
+			.sort((a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99))
+			.map((provider) => ({
+				id: provider.provider_id,
+				name: provider.provider_name,
+				logoPath: provider.logo_path ?? null
+			}));
+
+	const options: WatchOptions = {
+		country,
+		stream: map(entry.flatrate),
+		free: [...map(entry.free), ...map(entry.ads)],
+		rent: map(entry.rent),
+		buy: map(entry.buy),
+		link: entry.link ?? null
+	};
+
+	// A country can be listed with a link but no actual offers; that is not an
+	// answer worth rendering a section for.
+	const hasAny =
+		options.stream.length + options.free.length + options.rent.length + options.buy.length > 0;
+	return hasAny ? options : null;
 }
 
 /**
  * Fetch rich details for a single movie/TV title, including credits (cast) and
  * videos (trailer) in one request via `append_to_response`.
  */
-export async function getDetails(mediaType: MediaType, id: number): Promise<MediaDetails> {
+export async function getDetails(
+	mediaType: MediaType,
+	id: number,
+	country = 'US'
+): Promise<MediaDetails> {
 	const raw = await tmdbFetch<TmdbDetailsRaw>(`/${mediaType}/${id}`, {
 		language: 'en-US',
-		append_to_response: 'credits,videos'
+		append_to_response: 'credits,videos,watch/providers'
 	});
 
+	const seasons = mediaType === 'tv' ? splitSeasons(raw.seasons) : null;
 	const videos = raw.videos?.results ?? [];
 	const trailer =
 		videos.find((v) => v.site === 'YouTube' && v.type === 'Trailer') ??
@@ -133,7 +257,11 @@ export async function getDetails(mediaType: MediaType, id: number): Promise<Medi
 		genres: (raw.genres ?? []).map((genre) => genre.name),
 		releaseDate: raw.release_date ?? raw.first_air_date ?? null,
 		runtimeMinutes: raw.runtime ?? raw.episode_run_time?.[0] ?? null,
-		seasons: raw.number_of_seasons ?? null,
+		// `number_of_seasons` is the fallback only when the season list is missing;
+		// the list is the authority because it is the one that carries air dates.
+		seasons: seasons?.totalSeasons ?? raw.number_of_seasons ?? null,
+		airedSeasons: seasons?.airedSeasons ?? null,
+		upcomingSeason: seasons?.upcomingSeason ?? null,
 		productionStatus: raw.status?.trim() || null,
 		voteAverage: raw.vote_average ?? null,
 		backdropPath: raw.backdrop_path ?? null,
@@ -143,7 +271,8 @@ export async function getDetails(mediaType: MediaType, id: number): Promise<Medi
 			character: member.character ?? '',
 			profilePath: member.profile_path ?? null
 		})),
-		trailerKey: trailer?.key ?? null
+		trailerKey: trailer?.key ?? null,
+		watch: normalizeWatchOptions(raw['watch/providers']?.results, country)
 	};
 }
 

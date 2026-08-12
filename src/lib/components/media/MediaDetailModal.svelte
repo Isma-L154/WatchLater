@@ -6,6 +6,7 @@
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import SeasonPicker from './SeasonPicker.svelte';
+	import WatchProviders from './WatchProviders.svelte';
 	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
 	import { getReleaseInfo, releaseVerb } from '$lib/domain/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -18,10 +19,12 @@
 		saved: SavedEntry | null;
 		/** Saving requires an account; signed-out visitors get a sign-in prompt. */
 		signedIn: boolean;
+		/** ISO country for streaming availability, resolved at the edge. */
+		country: string;
 		onClose: () => void;
 	}
 
-	let { tmdbId, mediaType, saved, signedIn, onClose }: Props = $props();
+	let { tmdbId, mediaType, saved, signedIn, country, onClose }: Props = $props();
 
 	let details = $state<MediaDetails | null>(null);
 	let loading = $state(true);
@@ -31,7 +34,7 @@
 
 	// Refetch whenever the selected title changes.
 	$effect(() => {
-		void loadDetails(tmdbId, mediaType);
+		void loadDetails(tmdbId, mediaType, country);
 	});
 
 	/**
@@ -98,13 +101,13 @@
 		return () => window.removeEventListener('keydown', onKey);
 	});
 
-	async function loadDetails(id: number, type: MediaType) {
+	async function loadDetails(id: number, type: MediaType, region: string) {
 		loading = true;
 		loadError = false;
 		showTrailer = false;
 		details = null;
 		try {
-			const response = await fetch(`/api/details/${type}/${id}`);
+			const response = await fetch(`/api/details/${type}/${id}?country=${region}`);
 			if (!response.ok) throw new Error('Request failed');
 			details = (await response.json()) as MediaDetails;
 		} catch {
@@ -204,7 +207,7 @@
 				<p class="text-ink-muted">Couldn't load details.</p>
 				<button
 					type="button"
-					onclick={() => loadDetails(tmdbId, mediaType)}
+					onclick={() => loadDetails(tmdbId, mediaType, country)}
 					class="cursor-pointer rounded-lg bg-surface-hi px-4 py-2 text-sm font-semibold text-ink ring-1 ring-line transition-colors duration-200 hover:bg-line"
 				>
 					Try again
@@ -310,13 +313,19 @@
 					synopsis. For a show you are already watching this is the reason you
 					opened the sheet; the plot summary is not.
 				-->
-				{#if saved && details.mediaType === 'tv' && details.seasons && details.seasons > 1}
+				{#if saved && details.mediaType === 'tv' && details.airedSeasons && details.airedSeasons > 1}
 					<SeasonPicker
 						itemId={saved.id}
 						title={details.title}
-						totalSeasons={details.seasons}
-						seasonsSeen={saved.watched ? details.seasons : saved.seasonsSeen}
+						airedSeasons={details.airedSeasons}
+						totalSeasons={details.seasons ?? details.airedSeasons}
+						upcomingSeason={details.upcomingSeason}
+						seasonsSeen={saved.watched ? details.airedSeasons : saved.seasonsSeen}
 					/>
+				{/if}
+
+				{#if details.watch}
+					<WatchProviders watch={details.watch} title={details.title} />
 				{/if}
 
 				{#if details.genres.length}

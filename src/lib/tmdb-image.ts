@@ -22,6 +22,16 @@ export function profileUrl(path: string | null): string | null {
 	return path ? `${TMDB_IMAGE_BASE_URL}/w185${path}` : null;
 }
 
+/**
+ * Build a streaming provider logo URL.
+ *
+ * `w92` rather than the original: these render at 24px, and the source files are
+ * square logos where anything larger is wasted bytes on every row.
+ */
+export function providerLogoUrl(path: string | null): string | null {
+	return path ? `${TMDB_IMAGE_BASE_URL}/w92${path}` : null;
+}
+
 /** Extract the 4-digit year from a TMDB date string ("2024-05-01" -> "2024"). */
 export function releaseYear(date: string | null): string {
 	return date ? date.slice(0, 4) : '';

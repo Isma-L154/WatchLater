@@ -9,9 +9,21 @@ import type { MediaType } from '../types';
  * show it collapses "halfway through season 3" into a state that is simply
  * wrong. Progress is tracked per season — not per episode, which would mean an
  * extra request per season and a lot of tapping for precision nobody needs.
+ *
+ * The ceiling is the number of seasons that have *aired*, never the number that
+ * exist. TMDB counts announced seasons, so measuring against the total let you
+ * tick off a season that had not been broadcast yet.
  */
 
-export type ProgressState = 'notStarted' | 'inProgress' | 'complete';
+export type ProgressState =
+	/** Nothing watched. */
+	| 'notStarted'
+	/** Part-way through the aired seasons. */
+	| 'inProgress'
+	/** Every aired season seen, but the show has more coming. */
+	| 'caughtUp'
+	/** Every season seen and none announced — finished for good. */
+	| 'complete';
 
 /**
  * Sanity bound for a season count. TMDB's longest-running entries are an order
@@ -24,15 +36,21 @@ export interface TrackableEntry {
 	mediaType: MediaType;
 	watched: boolean;
 	seasonsSeen: number;
+	/** Every season TMDB lists, aired or not. */
 	totalSeasons: number | null;
+	/** Seasons that have premiered. Null means "not resolved yet". */
+	airedSeasons: number | null;
 }
 
 export interface SeasonProgress {
-	/** False for movies, and for shows whose season count we don't know yet. */
+	/** False for movies, and for shows whose aired-season count we don't know. */
 	trackable: boolean;
 	seasonsSeen: number;
+	/** The ceiling: how many seasons can actually be watched today. */
+	airedSeasons: number;
+	/** Including announced seasons, for context like "3 of 4". */
 	totalSeasons: number;
-	/** Completion as 0–100, for the progress bar. */
+	/** Completion against *aired* seasons as 0–100, for the progress bar. */
 	percent: number;
 	state: ProgressState;
 	/** Human-readable summary, e.g. "Season 3 of 5". */
@@ -40,12 +58,25 @@ export interface SeasonProgress {
 }
 
 /**
+ * How many seasons an entry can have watched, given what has aired.
+ *
+ * Falls back to the total only when the aired count has not been resolved yet
+ * (an entry saved before air dates were tracked). That is the pre-existing
+ * behaviour, and the read-path backfill replaces it on the next visit.
+ */
+export function watchableSeasons(entry: TrackableEntry): number | null {
+	return entry.airedSeasons ?? entry.totalSeasons;
+}
+
+/**
  * Season tracking only earns its extra UI on multi-season shows. A stepper that
- * goes from 0 to 1 is pure friction, so single-season shows (and shows whose
- * count TMDB hasn't given us yet) keep the plain watched toggle.
+ * goes from 0 to 1 is pure friction, so single-season shows keep the plain
+ * watched toggle — and so does a show with one aired season and a second merely
+ * announced, which is the case that used to render a misleading "0 of 2".
  */
 export function isTrackable(entry: TrackableEntry): boolean {
-	return entry.mediaType === 'tv' && entry.totalSeasons !== null && entry.totalSeasons > 1;
+	const watchable = watchableSeasons(entry);
+	return entry.mediaType === 'tv' && watchable !== null && watchable > 1;
 }
 
 export function getSeasonProgress(entry: TrackableEntry): SeasonProgress {
@@ -53,48 +84,66 @@ export function getSeasonProgress(entry: TrackableEntry): SeasonProgress {
 		return {
 			trackable: false,
 			seasonsSeen: 0,
-			totalSeasons: 0,
+			airedSeasons: 0,
+			totalSeasons: entry.totalSeasons ?? 0,
 			percent: entry.watched ? 100 : 0,
 			state: entry.watched ? 'complete' : 'notStarted',
 			label: ''
 		};
 	}
 
-	const totalSeasons = entry.totalSeasons as number;
-	const seasonsSeen = clampSeasons(entry.seasonsSeen, totalSeasons);
+	const airedSeasons = watchableSeasons(entry) as number;
+	const totalSeasons = Math.max(entry.totalSeasons ?? airedSeasons, airedSeasons);
+	const seasonsSeen = clampSeasons(entry.seasonsSeen, airedSeasons);
+	const moreComing = totalSeasons > airedSeasons;
+
 	const state: ProgressState =
-		seasonsSeen === 0 ? 'notStarted' : seasonsSeen >= totalSeasons ? 'complete' : 'inProgress';
+		seasonsSeen === 0
+			? 'notStarted'
+			: seasonsSeen < airedSeasons
+				? 'inProgress'
+				: moreComing
+					? 'caughtUp'
+					: 'complete';
 
 	return {
 		trackable: true,
 		seasonsSeen,
+		airedSeasons,
 		totalSeasons,
-		percent: Math.round((seasonsSeen / totalSeasons) * 100),
+		percent: Math.round((seasonsSeen / airedSeasons) * 100),
 		state,
-		label:
-			state === 'notStarted'
-				? 'Not started'
-				: state === 'complete'
-					? `All ${totalSeasons} seasons`
-					: `Season ${seasonsSeen} of ${totalSeasons}`
+		label: describe(state, seasonsSeen, airedSeasons)
 	};
 }
 
+function describe(state: ProgressState, seasonsSeen: number, airedSeasons: number): string {
+	if (state === 'notStarted') return 'Not started';
+	if (state === 'caughtUp') return 'Caught up';
+	if (state === 'complete') return `All ${airedSeasons} seasons`;
+	return `Season ${seasonsSeen} of ${airedSeasons}`;
+}
+
 /**
- * The invariant tying progress to status: finishing the last season marks the
- * show as watched, and stepping back from it un-marks it.
+ * The invariant tying progress to status: finishing the last *aired* season
+ * marks the show as watched, and stepping back from it un-marks it.
+ *
+ * Measuring against aired seasons is what makes the list self-maintaining. A
+ * show you are caught up on counts as watched and drops out of "To watch"; when
+ * its next season premieres the backfill raises the aired count, this returns
+ * false again, and the show reappears on its own.
  *
  * Enforced on the server for every write, never only in the UI, so a stale tab
  * or a replayed form post cannot leave the two disagreeing.
  */
-export function deriveWatched(seasonsSeen: number, totalSeasons: number | null): boolean {
-	return totalSeasons !== null && totalSeasons > 0 && seasonsSeen >= totalSeasons;
+export function deriveWatched(seasonsSeen: number, airedSeasons: number | null): boolean {
+	return airedSeasons !== null && airedSeasons > 0 && seasonsSeen >= airedSeasons;
 }
 
-/** Constrain a season target to `0..totalSeasons`, rejecting junk input. */
-export function clampSeasons(value: number, totalSeasons: number | null): number {
+/** Constrain a season target to `0..airedSeasons`, rejecting junk input. */
+export function clampSeasons(value: number, airedSeasons: number | null): number {
 	if (!Number.isFinite(value)) return 0;
-	const upperBound = Math.min(totalSeasons ?? 0, MAX_SEASONS);
+	const upperBound = Math.min(airedSeasons ?? 0, MAX_SEASONS);
 	return Math.max(0, Math.min(Math.trunc(value), upperBound));
 }
 
@@ -106,4 +155,14 @@ export function normalizeTotalSeasons(value: number | null | undefined): number 
 	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
 	const total = Math.trunc(value);
 	return total >= 1 && total <= MAX_SEASONS ? total : null;
+}
+
+/**
+ * Same bounds as `normalizeTotalSeasons`, but zero is meaningful: a show can
+ * legitimately have no aired seasons yet (announced, nothing broadcast).
+ */
+export function normalizeAiredSeasons(value: number | null | undefined): number | null {
+	if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+	const aired = Math.trunc(value);
+	return aired >= 0 && aired <= MAX_SEASONS ? aired : null;
 }

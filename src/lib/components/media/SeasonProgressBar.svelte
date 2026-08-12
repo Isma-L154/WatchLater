@@ -20,10 +20,12 @@
 
 	const MAX_SEGMENTS = 12;
 
-	const segmented = $derived(progress.totalSeasons <= MAX_SEGMENTS);
-	const complete = $derived(progress.state === 'complete');
+	// Segments track what can be watched, not what has been announced — an
+	// unaired season is not a slot you can fill in.
+	const segmented = $derived(progress.airedSeasons <= MAX_SEGMENTS);
+	const done = $derived(progress.state === 'caughtUp' || progress.state === 'complete');
 	const height = $derived(size === 'sm' ? 'h-1' : 'h-1.5');
-	const fill = $derived(complete ? 'bg-mint' : 'bg-sky');
+	const fill = $derived(done ? 'bg-mint' : 'bg-sky');
 </script>
 
 <!--
@@ -33,7 +35,7 @@
 -->
 <div class="flex w-full items-center gap-[3px]" aria-hidden="true">
 	{#if segmented}
-		{#each { length: progress.totalSeasons }, index (index)}
+		{#each { length: progress.airedSeasons }, index (index)}
 			<span
 				class="{height} flex-1 rounded-full transition-colors duration-300
 					{index < progress.seasonsSeen ? fill : 'bg-line'}"

@@ -241,6 +241,7 @@
 		mediaType={selected.mediaType}
 		saved={selectedSaved}
 		{signedIn}
+		country={page.data.country}
 		onClose={() => (selected = null)}
 	/>
 {/if}

@@ -1,9 +1,14 @@
 import { fail } from '@sveltejs/kit';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import { getDb } from './db';
 import { watchlistItem } from './db/schema';
 import { getDetails } from './tmdb';
-import { clampSeasons, deriveWatched, normalizeTotalSeasons } from '$lib/domain/progress';
+import {
+	clampSeasons,
+	deriveWatched,
+	normalizeAiredSeasons,
+	normalizeTotalSeasons
+} from '$lib/domain/progress';
 import type { MediaType } from '$lib/types';
 import type { Actions } from '@sveltejs/kit';
 
@@ -28,11 +33,11 @@ const UNAUTHENTICATED = { message: 'Please sign in first.' };
 const MAX_ITEMS_PER_USER = 5000;
 
 /**
- * How many legacy rows one page load may repair (see `backfillSeasonCounts`).
+ * How many rows one page load may re-resolve (see `refreshSeasonData`).
  *
  * Each repair costs a TMDB request, and they run in parallel, so this is the cap
  * on how long a load can be held up by work the visitor never asked for. Lists
- * converge over a couple of visits, which is fine for a one-off migration.
+ * converge over a couple of visits, which is fine for background upkeep.
  */
 const BACKFILL_BATCH_SIZE = 8;
 
@@ -64,64 +69,95 @@ export async function countWatchlist(userId: string): Promise<number> {
 	return Number(row?.total ?? 0);
 }
 
-type WatchlistRow = Awaited<ReturnType<typeof loadWatchlist>>[number];
+export type WatchlistRow = Awaited<ReturnType<typeof loadWatchlist>>[number];
+
+/** Today as `YYYY-MM-DD` in UTC, matching how TMDB writes air dates. */
+function todayIso(now: Date = new Date()): string {
+	return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()))
+		.toISOString()
+		.slice(0, 10);
+}
 
 /**
- * Fill in `totalSeasons` for shows that were saved before season tracking
- * existed, and return the list with those rows patched.
+ * Which rows need a trip to TMDB, and why.
  *
- * This is the difference between the feature working and the feature being
- * invisible: a null season count is what marks an entry as *not* trackable, so
- * every show added before the columns existed silently renders the plain
- * watched toggle — the tracker never appears, and the feature looks unbuilt.
+ * Two cases, both resolved the same way. A show with no `airedSeasons` has never
+ * been resolved — either it predates season tracking or its save-time lookup
+ * failed. A show whose next season's air date has passed is stale in the way
+ * that matters most: that season is watchable now, and until we notice, the
+ * viewer is told they are still caught up.
+ */
+function needsSeasonRefresh(item: WatchlistRow, today: string): boolean {
+	if (item.mediaType !== 'tv') return false;
+	if (item.airedSeasons === null) return true;
+	return item.nextSeasonAirDate !== null && item.nextSeasonAirDate <= today;
+}
+
+/**
+ * Resolve season data for shows that need it, and return the list with those
+ * rows patched.
  *
- * Repairing on read (rather than in a migration) means it also covers entries
- * whose save-time TMDB lookup failed, and it needs no deploy-time backfill job.
+ * Doing this on read rather than in a migration or a cron job is what keeps the
+ * feature self-maintaining: it covers entries saved before the columns existed,
+ * entries whose save-time lookup failed, and — the ongoing case — shows that
+ * have since premiered a new season. When that last one resolves, `airedSeasons`
+ * rises above `seasonsSeen`, `deriveWatched` turns false, and the show reappears
+ * in "To watch" without anybody doing anything.
  *
  * The two ways a lookup can come back empty are deliberately *not* treated the
- * same. A network or API failure leaves the row null so the next visit retries;
- * a successful response that simply has no usable season count writes the
- * `NO_SEASON_DATA` sentinel, which stops the repair. Without that distinction a
- * single title TMDB has no seasons for would re-trigger the full batch of
- * lookups on every single page load, forever.
+ * same. A network or API failure leaves the row untouched so the next visit
+ * retries; a successful response that simply has no usable season list writes
+ * the `NO_SEASON_DATA` sentinel, which stops the repair. Without that
+ * distinction a single title TMDB has no seasons for would re-trigger the full
+ * batch of lookups on every page load, forever.
  */
-export async function backfillSeasonCounts(items: WatchlistRow[]): Promise<WatchlistRow[]> {
+export async function refreshSeasonData(items: WatchlistRow[]): Promise<WatchlistRow[]> {
+	const today = todayIso();
 	const pending = items
-		.filter((item) => item.mediaType === 'tv' && item.totalSeasons === null)
+		.filter((item) => needsSeasonRefresh(item, today))
 		.slice(0, BACKFILL_BATCH_SIZE);
 	if (pending.length === 0) return items;
 
 	const resolved = await Promise.all(
-		pending.map(async (item) => ({
-			id: item.id,
-			totalSeasons: await resolveSeasonCount(item.tmdbId)
-		}))
+		pending.map(async (item) => ({ id: item.id, info: await resolveSeasonInfo(item.tmdbId) }))
 	);
-
-	// Group by value so a batch of shows costs one UPDATE per distinct season
-	// count (usually two or three) instead of one per row.
-	const byCount = new Map<number, string[]>();
-	for (const { id, totalSeasons } of resolved) {
-		if (totalSeasons === null) continue;
-		const ids = byCount.get(totalSeasons) ?? [];
-		ids.push(id);
-		byCount.set(totalSeasons, ids);
-	}
-	if (byCount.size === 0) return items;
 
 	const db = getDb();
+	const patches = new Map<string, Partial<WatchlistRow>>();
+
 	await Promise.all(
-		[...byCount].map(([totalSeasons, ids]) =>
-			db.update(watchlistItem).set({ totalSeasons }).where(inArray(watchlistItem.id, ids))
-		)
+		resolved.map(async ({ id, info }) => {
+			if (!info) return;
+
+			const source = items.find((item) => item.id === id);
+			if (!source) return;
+
+			/**
+			 * Progress is re-derived here rather than left alone, because a newly
+			 * aired season changes the answer: someone marked "watched" at 3 of 3
+			 * is no longer watched once a fourth is out. The seen count itself is
+			 * never touched — they did watch those seasons.
+			 */
+			const seasonsSeen = clampSeasons(source.seasonsSeen, info.airedSeasons);
+			const patch = {
+				totalSeasons: info.totalSeasons,
+				airedSeasons: info.airedSeasons,
+				nextSeasonNumber: info.nextSeasonNumber,
+				nextSeasonAirDate: info.nextSeasonAirDate,
+				seasonsSeen,
+				watched: deriveWatched(seasonsSeen, info.airedSeasons)
+			};
+
+			patches.set(id, patch);
+			await db.update(watchlistItem).set(patch).where(eq(watchlistItem.id, id));
+		})
 	);
 
-	// Patch the in-memory copy too, so the tracker shows up on this render rather
+	if (patches.size === 0) return items;
+
+	// Patch the in-memory copy too, so the change shows up on this render rather
 	// than only after the visitor happens to reload.
-	const patched = new Map(resolved.map(({ id, totalSeasons }) => [id, totalSeasons]));
-	return items.map((item) =>
-		patched.has(item.id) ? { ...item, totalSeasons: patched.get(item.id)! } : item
-	);
+	return items.map((item) => (patches.has(item.id) ? { ...item, ...patches.get(item.id) } : item));
 }
 
 export const watchlistActions = {
@@ -169,7 +205,7 @@ export const watchlistActions = {
 				releaseDate: clip(form.get('releaseDate'), 10),
 				overview: clip(form.get('overview'), 2000),
 				voteAverage: toRating(form.get('voteAverage')),
-				totalSeasons: await fetchTotalSeasons(mediaType, tmdbId)
+				...(await seasonInfoForSave(mediaType, tmdbId))
 			})
 			// Backstop for two concurrent saves of the same title: the unique index
 			// is the real guarantee, the check above is just the cheap fast path.
@@ -207,19 +243,25 @@ export const watchlistActions = {
 
 		const db = getDb();
 		const [item] = await db
-			.select({ watched: watchlistItem.watched, totalSeasons: watchlistItem.totalSeasons })
+			.select({
+				watched: watchlistItem.watched,
+				totalSeasons: watchlistItem.totalSeasons,
+				airedSeasons: watchlistItem.airedSeasons
+			})
 			.from(watchlistItem)
 			.where(ownedRow(id, locals.user.id))
 			.limit(1);
 		if (!item) return fail(404, { message: 'Item not found.' });
 
 		const watched = !item.watched;
-		const total = item.totalSeasons;
+		// Only aired seasons can be ticked off, so "mark watched" lands on the last
+		// broadcast season rather than on an announced one.
+		const ceiling = item.airedSeasons ?? item.totalSeasons;
 		await db
 			.update(watchlistItem)
 			.set({
 				watched,
-				...(total ? { seasonsSeen: watched ? total : Math.max(total - 1, 0) } : {})
+				...(ceiling ? { seasonsSeen: watched ? ceiling : Math.max(ceiling - 1, 0) } : {})
 			})
 			.where(ownedRow(id, locals.user.id));
 
@@ -247,7 +289,8 @@ export const watchlistActions = {
 			.select({
 				tmdbId: watchlistItem.tmdbId,
 				mediaType: watchlistItem.mediaType,
-				totalSeasons: watchlistItem.totalSeasons
+				totalSeasons: watchlistItem.totalSeasons,
+				airedSeasons: watchlistItem.airedSeasons
 			})
 			.from(watchlistItem)
 			.where(ownedRow(id, locals.user.id))
@@ -257,30 +300,48 @@ export const watchlistActions = {
 		if (item.mediaType !== 'tv') return fail(400, { message: 'Only TV shows track seasons.' });
 
 		/**
-		 * Ask TMDB for the season count in exactly two situations: when we have
-		 * never stored one (an entry saved before season tracking existed), and
-		 * when this change would complete the show — the one moment where being
-		 * wrong is visible, because a still-running series that has since gained a
-		 * season must not be marked as finished.
+		 * Re-read from TMDB in exactly two situations: when nothing is stored (an
+		 * entry that predates air-date tracking), and when this change would use up
+		 * every aired season — the one moment where being stale is visible, because
+		 * a season may have premiered since we last looked.
 		 *
 		 * Every other tap is a pure database write with no external call.
 		 */
-		const stored = item.totalSeasons;
-		const completing = stored !== null && requested >= stored;
-		const totalSeasons =
-			stored === null || completing
-				? ((await fetchTotalSeasons('tv', item.tmdbId)) ?? stored)
-				: stored;
+		const stored = item.airedSeasons;
+		const shouldRefresh = stored === null || requested >= stored;
+		const fresh = shouldRefresh ? await resolveSeasonInfo(item.tmdbId) : null;
 
-		if (!totalSeasons) return fail(400, { message: 'No season data available for this title.' });
+		const airedSeasons = fresh?.airedSeasons ?? stored;
+		if (!airedSeasons) return fail(400, { message: 'No season data available for this title.' });
 
-		const seasonsSeen = clampSeasons(requested, totalSeasons);
+		/**
+		 * The clamp is the guard that matters: it is measured against *aired*
+		 * seasons, so a request to tick off an announced season silently lands on
+		 * the last one that actually exists instead of being honoured.
+		 */
+		const seasonsSeen = clampSeasons(requested, airedSeasons);
+
+		// Only a fresh lookup may touch the descriptive columns — writing them from
+		// a skipped one would blank the row with nulls it never learned.
 		await db
 			.update(watchlistItem)
-			.set({ seasonsSeen, totalSeasons, watched: deriveWatched(seasonsSeen, totalSeasons) })
+			.set({
+				seasonsSeen,
+				airedSeasons,
+				watched: deriveWatched(seasonsSeen, airedSeasons),
+				...(fresh && {
+					totalSeasons: fresh.totalSeasons,
+					nextSeasonNumber: fresh.nextSeasonNumber,
+					nextSeasonAirDate: fresh.nextSeasonAirDate
+				})
+			})
 			.where(ownedRow(id, locals.user.id));
 
-		return { seasonsSeen, totalSeasons };
+		return {
+			seasonsSeen,
+			airedSeasons,
+			totalSeasons: fresh?.totalSeasons ?? item.totalSeasons
+		};
 	}
 } satisfies Actions;
 
@@ -292,29 +353,70 @@ export const watchlistActions = {
  * non-fatal: the entry is simply saved without season tracking, which the next
  * page load will try to repair.
  */
-async function fetchTotalSeasons(mediaType: MediaType, tmdbId: number): Promise<number | null> {
-	if (mediaType !== 'tv') return null;
-	const resolved = await resolveSeasonCount(tmdbId);
-	// On the write path a sentinel and a failure are the same thing — both mean
-	// "no tracking for now" — so it is stored as null and re-checked on read.
-	return resolved === null || resolved === NO_SEASON_DATA ? null : resolved;
+/** Everything the row stores about a show's seasons. */
+interface SeasonInfo {
+	totalSeasons: number | null;
+	airedSeasons: number | null;
+	nextSeasonNumber: number | null;
+	nextSeasonAirDate: string | null;
+}
+
+/** No season data at all — nothing to track, nothing to come. */
+const NO_SEASONS: SeasonInfo = {
+	totalSeasons: NO_SEASON_DATA,
+	airedSeasons: NO_SEASON_DATA,
+	nextSeasonNumber: null,
+	nextSeasonAirDate: null
+};
+
+/**
+ * Ask TMDB how many of a show's seasons exist, how many have aired, and when the
+ * next one lands.
+ *
+ * Returns null when the request itself failed, versus a `NO_SEASON_DATA`-filled
+ * record when TMDB answered but had nothing usable — the distinction the refresh
+ * relies on to choose between "try again later" and "record this and stop".
+ */
+async function resolveSeasonInfo(tmdbId: number): Promise<SeasonInfo | null> {
+	try {
+		const details = await getDetails('tv', tmdbId);
+		const totalSeasons = normalizeTotalSeasons(details.seasons);
+		const airedSeasons = normalizeAiredSeasons(details.airedSeasons);
+		if (totalSeasons === null || airedSeasons === null) return NO_SEASONS;
+
+		return {
+			totalSeasons,
+			airedSeasons,
+			nextSeasonNumber: details.upcomingSeason?.number ?? null,
+			nextSeasonAirDate: details.upcomingSeason?.airDate ?? null
+		};
+	} catch (err) {
+		console.error('Failed to read season data for tv/%d:', tmdbId, err);
+		return null;
+	}
 }
 
 /**
- * Ask TMDB for a show's season count.
- *
- * Returns the count, `NO_SEASON_DATA` when TMDB answered but had nothing usable,
- * or null when the request itself failed — a distinction the backfill relies on
- * to decide between "record this and stop" and "try again later".
+ * Season data for a title being saved. Movies have none, and a failed lookup is
+ * non-fatal: the entry is stored without it and the read path repairs it.
  */
-async function resolveSeasonCount(tmdbId: number): Promise<number | null> {
-	try {
-		const details = await getDetails('tv', tmdbId);
-		return normalizeTotalSeasons(details.seasons) ?? NO_SEASON_DATA;
-	} catch (err) {
-		console.error('Failed to read season count for tv/%d:', tmdbId, err);
-		return null;
+async function seasonInfoForSave(mediaType: MediaType, tmdbId: number): Promise<SeasonInfo> {
+	if (mediaType !== 'tv') {
+		return {
+			totalSeasons: null,
+			airedSeasons: null,
+			nextSeasonNumber: null,
+			nextSeasonAirDate: null
+		};
 	}
+	return (
+		(await resolveSeasonInfo(tmdbId)) ?? {
+			totalSeasons: null,
+			airedSeasons: null,
+			nextSeasonNumber: null,
+			nextSeasonAirDate: null
+		}
+	);
 }
 
 /**

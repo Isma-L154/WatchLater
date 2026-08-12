@@ -42,7 +42,8 @@ async function loadSavedIndex(userId: string | undefined): Promise<Record<string
 			mediaType: watchlistItem.mediaType,
 			watched: watchlistItem.watched,
 			seasonsSeen: watchlistItem.seasonsSeen,
-			totalSeasons: watchlistItem.totalSeasons
+			totalSeasons: watchlistItem.totalSeasons,
+			airedSeasons: watchlistItem.airedSeasons
 		})
 		.from(watchlistItem)
 		.where(eq(watchlistItem.userId, userId));
@@ -54,7 +55,8 @@ async function loadSavedIndex(userId: string | undefined): Promise<Record<string
 				id: row.id,
 				watched: row.watched,
 				seasonsSeen: row.seasonsSeen,
-				totalSeasons: row.totalSeasons
+				totalSeasons: row.totalSeasons,
+				airedSeasons: row.airedSeasons
 			}
 		])
 	);

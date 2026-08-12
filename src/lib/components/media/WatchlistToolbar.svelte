@@ -27,10 +27,18 @@
 		query = $bindable()
 	}: Props = $props();
 
-	// The extra lenses only earn their place once the list actually contains
-	// something they would show — an empty tab is just noise on a phone.
+	/**
+	 * "To watch" leads and is the default; there is no "All".
+	 *
+	 * The list exists to answer "what should I watch next", and an unfiltered
+	 * view mixes that with everything already finished — so the first thing you
+	 * saw was the one thing you were not looking for. Everything is still
+	 * reachable, just not as the landing state.
+	 *
+	 * The extra lenses only earn their place once the list actually contains
+	 * something they would show — an empty tab is just noise on a phone.
+	 */
 	const statusOptions = $derived([
-		{ value: 'all', label: 'All', count: counts.all },
 		{ value: 'toWatch', label: 'To watch', count: counts.toWatch },
 		...(counts.inProgress > 0
 			? [{ value: 'inProgress', label: 'Watching', count: counts.inProgress }]

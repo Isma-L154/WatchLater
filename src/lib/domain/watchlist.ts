@@ -16,6 +16,7 @@ export interface WatchlistEntry {
 	releaseDate: string | null;
 	seasonsSeen: number;
 	totalSeasons: number | null;
+	airedSeasons: number | null;
 }
 
 /** Current view options coming from the UI controls. */

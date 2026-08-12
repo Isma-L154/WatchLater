@@ -3,6 +3,8 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { getReleaseInfo } from '$lib/domain/release';
+	import type { UpcomingSeason } from '$lib/types';
 
 	/**
 	 * Full season picker for the detail sheet.
@@ -11,34 +13,43 @@
 	 * seasons over the weekend" — jumping straight to a season is a single tap
 	 * instead of four round-trips through the stepper.
 	 *
-	 * Season counts come from the live TMDB payload rather than the stored row, so
-	 * an entry saved before season tracking existed can start tracking from here.
-	 * The server still resolves the authoritative total before it writes.
+	 * Seasons that have not aired are rendered, but disabled: hiding them would
+	 * lose the information that more is coming, and enabling them would let you
+	 * claim to have watched something that has not been broadcast.
 	 */
 	interface Props {
 		itemId: string;
 		title: string;
+		/** Seasons that have premiered — the ceiling for what can be ticked. */
+		airedSeasons: number;
+		/** Including announced ones, so pending seasons can be shown greyed out. */
 		totalSeasons: number;
+		upcomingSeason: UpcomingSeason | null;
 		seasonsSeen: number;
 	}
 
-	let { itemId, title, totalSeasons, seasonsSeen }: Props = $props();
+	let { itemId, title, airedSeasons, totalSeasons, upcomingSeason, seasonsSeen }: Props = $props();
 
-	const complete = $derived(seasonsSeen >= totalSeasons);
+	const caughtUp = $derived(seasonsSeen >= airedSeasons);
 	const nextSeason = $derived(seasonsSeen + 1);
+	const moreComing = $derived(totalSeasons > airedSeasons);
 
 	const summary = $derived(
 		seasonsSeen === 0
 			? 'Not started'
-			: complete
-				? `All ${totalSeasons} seasons watched`
-				: `Season ${seasonsSeen} of ${totalSeasons}`
+			: caughtUp
+				? moreComing
+					? 'Caught up'
+					: `All ${airedSeasons} seasons watched`
+				: `Season ${seasonsSeen} of ${airedSeasons}`
 	);
+
+	const release = $derived(upcomingSeason ? getReleaseInfo(upcomingSeason.airDate) : null);
 
 	/**
 	 * Feedback comes from the server's response rather than the pre-click state:
 	 * the action may have discovered a newly aired season, so only it knows
-	 * whether the show is actually finished.
+	 * whether the viewer is actually caught up.
 	 */
 	const onSubmit: SubmitFunction = () => {
 		return async ({ result, update }) => {
@@ -47,11 +58,11 @@
 				if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
 				return;
 			}
-			const payload = result.data as { seasonsSeen?: number; totalSeasons?: number } | undefined;
+			const payload = result.data as { seasonsSeen?: number; airedSeasons?: number } | undefined;
 			const seen = payload?.seasonsSeen ?? 0;
-			const total = payload?.totalSeasons ?? 0;
+			const aired = payload?.airedSeasons ?? 0;
 
-			if (total && seen >= total) toasts.add(`Finished “${title}” 🎉`);
+			if (aired && seen >= aired) toasts.add(`Caught up on “${title}” 🎉`);
 			else if (seen === 0) toasts.add(`Reset progress for “${title}”`, 'info');
 			else toasts.add(`Season ${seen} watched`);
 		};
@@ -69,7 +80,7 @@
 		>
 			Season progress
 		</h3>
-		<span class="text-xs font-semibold {complete ? 'text-mint' : 'text-ink-muted'}">{summary}</span>
+		<span class="text-xs font-semibold {caughtUp ? 'text-mint' : 'text-ink-muted'}">{summary}</span>
 	</div>
 
 	<form method="POST" action="?/setSeasons" use:enhance={onSubmit} class="mt-3">
@@ -82,19 +93,26 @@
 		<div class="flex flex-wrap gap-1.5">
 			{#each { length: totalSeasons }, index (index)}
 				{@const season = index + 1}
+				{@const aired = season <= airedSeasons}
 				{@const seen = season <= seasonsSeen}
 				<button
 					type="submit"
 					name="seasons"
 					value={season === seasonsSeen ? season - 1 : season}
+					disabled={!aired}
 					aria-pressed={seen}
-					aria-label={season === seasonsSeen
-						? `Mark season ${season} of ${title} as unwatched`
-						: `Mark seasons 1 to ${season} of ${title} as watched`}
-					class="h-9 min-w-9 cursor-pointer rounded-lg px-2.5 text-xs font-bold tabular-nums transition-colors duration-200 active:scale-95
-						{seen
-						? 'bg-brand text-white hover:bg-brand-hi'
-						: 'bg-surface-hi text-ink-faint ring-1 ring-line ring-inset hover:bg-line hover:text-ink'}"
+					aria-label={!aired
+						? `Season ${season} of ${title} has not aired yet`
+						: season === seasonsSeen
+							? `Mark season ${season} of ${title} as unwatched`
+							: `Mark seasons 1 to ${season} of ${title} as watched`}
+					title={!aired ? 'Not aired yet' : undefined}
+					class="h-9 min-w-9 rounded-lg px-2.5 text-xs font-bold tabular-nums transition-colors duration-200
+						{!aired
+						? 'cursor-not-allowed border border-dashed border-line bg-transparent text-ink-faint'
+						: seen
+							? 'cursor-pointer bg-brand text-white hover:bg-brand-hi active:scale-95'
+							: 'cursor-pointer bg-surface-hi text-ink-faint ring-1 ring-line ring-inset hover:bg-line hover:text-ink active:scale-95'}"
 				>
 					{season}
 				</button>
@@ -103,7 +121,7 @@
 
 		<!-- The single most likely next action, named explicitly so it needs no
 		     interpretation of the pill row above it. -->
-		{#if !complete}
+		{#if !caughtUp}
 			<button
 				type="submit"
 				name="seasons"
@@ -115,4 +133,24 @@
 			</button>
 		{/if}
 	</form>
+
+	<!--
+		The answer to "why can't I tick season 4?", stated rather than left to be
+		inferred from a disabled button.
+	-->
+	{#if upcomingSeason && release}
+		<p class="mt-3 flex items-center gap-2 text-xs text-amber">
+			<span class="relative flex h-1.5 w-1.5 flex-shrink-0">
+				<span
+					class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70"
+				></span>
+				<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber"></span>
+			</span>
+			{#if release.state === 'upcoming'}
+				Season {upcomingSeason.number} premieres {release.fullDate}
+			{:else}
+				Season {upcomingSeason.number} announced — no date yet
+			{/if}
+		</p>
+	{/if}
 </section>

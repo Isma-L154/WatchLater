@@ -1,4 +1,9 @@
-import { backfillSeasonCounts, loadWatchlist, watchlistActions } from '$lib/server/watchlist';
+import {
+	refreshSeasonData,
+	loadWatchlist,
+	watchlistActions,
+	type WatchlistRow
+} from '$lib/server/watchlist';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -8,12 +13,17 @@ import type { Actions, PageServerLoad } from './$types';
  * querying at all, and the page renders its signed-out state instead.
  */
 export const load: PageServerLoad = async ({ locals }) => {
-	if (!locals.user) return { items: [] };
+	// Typed rather than a bare `[]`: an untyped empty array widens the union the
+	// page sees to `never[]`, which breaks inference on every helper downstream.
+	if (!locals.user) return { items: [] as WatchlistRow[] };
 
-	// Repair-on-read: shows saved before season tracking existed have no season
-	// count, which silently disables the tracker for them. See the function for
-	// why this lives on the read path.
-	const items = await backfillSeasonCounts(await loadWatchlist(locals.user.id));
+	/**
+	 * Resolve-on-read: shows saved before air dates were tracked have no aired
+	 * count (which silently disables the tracker), and shows whose next season has
+	 * since premiered are stale in a way the viewer would notice. See the function
+	 * for why this lives on the read path.
+	 */
+	const items = await refreshSeasonData(await loadWatchlist(locals.user.id));
 	return { items };
 };
 

@@ -14,6 +14,9 @@ const show = (over: Partial<TrackableEntry> = {}): TrackableEntry => ({
 	watched: false,
 	seasonsSeen: 0,
 	totalSeasons: 5,
+	// Defaults to "all five have aired"; tests that care about unaired seasons
+	// override this to a lower number.
+	airedSeasons: over.totalSeasons === undefined ? 5 : (over.totalSeasons ?? null),
 	...over
 });
 
@@ -34,13 +37,69 @@ describe('isTrackable', () => {
 		expect(isTrackable(show({ totalSeasons: 1 }))).toBe(false);
 	});
 
-	// 0 is the `NO_SEASON_DATA` sentinel the backfill writes when TMDB answered
+	// 0 is the `NO_SEASON_DATA` sentinel the refresh writes when TMDB answered
 	// but had nothing usable. It must behave exactly like "not trackable", not
 	// like a zero-season show.
 	it('does not track shows marked as having no season data', () => {
-		expect(isTrackable(show({ totalSeasons: 0 }))).toBe(false);
-		expect(getSeasonProgress(show({ totalSeasons: 0 })).trackable).toBe(false);
+		expect(isTrackable(show({ totalSeasons: 0, airedSeasons: 0 }))).toBe(false);
+		expect(getSeasonProgress(show({ totalSeasons: 0, airedSeasons: 0 })).trackable).toBe(false);
 		expect(deriveWatched(0, 0)).toBe(false);
+	});
+
+	/**
+	 * The case this whole distinction exists for: a show whose only second season
+	 * is announced but unaired must not offer a "0 of 2" tracker, because the
+	 * only thing you could do with it is claim to have watched an unaired season.
+	 */
+	it('does not track a show whose extra seasons have not aired', () => {
+		expect(isTrackable(show({ totalSeasons: 2, airedSeasons: 1 }))).toBe(false);
+	});
+
+	it('measures trackability against aired seasons, not announced ones', () => {
+		expect(isTrackable(show({ totalSeasons: 9, airedSeasons: 1 }))).toBe(false);
+		expect(isTrackable(show({ totalSeasons: 9, airedSeasons: 2 }))).toBe(true);
+	});
+});
+
+/**
+ * Reacher, as reported: three seasons aired and a fourth dated for the future.
+ * TMDB reports `number_of_seasons: 4`, so measuring against the total let you
+ * tick off a season that had not been broadcast.
+ */
+describe('unaired seasons', () => {
+	const reacher = (seasonsSeen: number) => show({ totalSeasons: 4, airedSeasons: 3, seasonsSeen });
+
+	it('caps the ceiling at the aired seasons', () => {
+		expect(getSeasonProgress(reacher(0)).airedSeasons).toBe(3);
+		expect(getSeasonProgress(reacher(0)).totalSeasons).toBe(4);
+	});
+
+	it('refuses to record a season that has not aired', () => {
+		expect(clampSeasons(4, 3)).toBe(3);
+		expect(getSeasonProgress(reacher(4)).seasonsSeen).toBe(3);
+	});
+
+	it('reports "caught up" rather than "complete" while a season is pending', () => {
+		const progress = getSeasonProgress(reacher(3));
+		expect(progress.state).toBe('caughtUp');
+		expect(progress.label).toBe('Caught up');
+		expect(progress.percent).toBe(100);
+	});
+
+	it('only reports "complete" once nothing is left to air', () => {
+		expect(
+			getSeasonProgress(show({ totalSeasons: 4, airedSeasons: 4, seasonsSeen: 4 })).state
+		).toBe('complete');
+	});
+
+	/**
+	 * The self-maintaining part: being caught up counts as watched, so the show
+	 * leaves "To watch" — and when the next season airs and the refresh raises
+	 * the aired count, it comes back on its own.
+	 */
+	it('drops back out of watched when a new season airs', () => {
+		expect(deriveWatched(3, 3)).toBe(true);
+		expect(deriveWatched(3, 4)).toBe(false);
 	});
 });
 

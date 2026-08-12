@@ -12,6 +12,7 @@ const entry = (over: Partial<WatchlistEntry> & { title: string }): WatchlistEntr
 	releaseDate: null,
 	seasonsSeen: 0,
 	totalSeasons: null,
+	airedSeasons: null,
 	...over
 });
 

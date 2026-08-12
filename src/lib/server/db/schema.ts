@@ -94,9 +94,22 @@ export const watchlistItem = sqliteTable(
 		 * yet" (every movie, plus any show still awaiting the read-path backfill),
 		 * and 0 is the sentinel for "TMDB has no season data for this title" —
 		 * which stops that backfill retrying forever. See `NO_SEASON_DATA`.
+		 *
+		 * `airedSeasons` is the one progress is measured against, and it is
+		 * deliberately not the same number: TMDB counts announced seasons in its
+		 * total, so a show with three aired seasons and a fourth dated for next
+		 * year would otherwise be tickable to "fully watched" today.
+		 *
+		 * `nextSeasonNumber` / `nextSeasonAirDate` describe the next season still
+		 * to premiere. The date is also what schedules the refresh: once it is in
+		 * the past, the entry is re-read from TMDB, `airedSeasons` goes up, and the
+		 * show drops back out of "watched" on its own.
 		 */
 		seasonsSeen: integer('seasons_seen').notNull().default(0),
 		totalSeasons: integer('total_seasons'),
+		airedSeasons: integer('aired_seasons'),
+		nextSeasonNumber: integer('next_season_number'),
+		nextSeasonAirDate: text('next_season_air_date'),
 
 		addedAt: integer('added_at', { mode: 'timestamp' })
 			.notNull()

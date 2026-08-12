@@ -29,11 +29,24 @@ export function mediaKey(item: Identifiable): string {
  * (page 1) rather than the stale one.
  */
 export function dedupeByKey<T extends Identifiable>(items: readonly T[]): T[] {
-	const seen = new Set<string>();
+	return uniqueBy(items, mediaKey);
+}
+
+/**
+ * Generic "first occurrence wins" dedupe.
+ *
+ * Lives here rather than beside its callers because Svelte components and rune
+ * modules are lint-restricted from holding a plain `Set` — reasonably, since a
+ * mutable one there would silently fail to drive reactivity. This is pure
+ * scratch state inside a single call, which is exactly the case that restriction
+ * does not apply to.
+ */
+export function uniqueBy<T, K>(items: readonly T[], keyOf: (item: T) => K): T[] {
+	const seen = new Set<K>();
 	const unique: T[] = [];
 
 	for (const item of items) {
-		const key = mediaKey(item);
+		const key = keyOf(item);
 		if (seen.has(key)) continue;
 		seen.add(key);
 		unique.push(item);

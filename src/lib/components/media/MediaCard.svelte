@@ -23,6 +23,12 @@
 		/** Extra line under the title, e.g. season progress. */
 		note?: string;
 		/**
+		 * A TV season that has not aired, badged on the poster the same way an
+		 * unreleased film is — the visual language for "not watchable yet" should
+		 * not depend on whether the title is a film or a show.
+		 */
+		upcomingSeason?: { number: number; label: string } | null;
+		/**
 		 * Set on the tiles that land above the fold.
 		 *
 		 * `loading="lazy"` is right for a long grid but wrong for its first row:
@@ -49,6 +55,7 @@
 		mediaType,
 		watched = false,
 		note,
+		upcomingSeason = null,
 		priority = false,
 		onSelect,
 		actions
@@ -109,7 +116,24 @@
 		{/if}
 
 		<!-- Release marker: a soft amber pulse reads as "pending" at a glance,
-		     without competing with the poster art. -->
+		     without competing with the poster art. The same badge covers a film
+		     that is not out and a season that has not aired. -->
+		{#if !unreleased && upcomingSeason}
+			<span
+				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 backdrop-blur-sm ring-inset"
+			>
+				<span class="sr-only">Next season not aired yet —</span>
+				<span class="relative flex h-1.5 w-1.5">
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber opacity-70"
+					></span>
+					<span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber"></span>
+				</span>
+				S{upcomingSeason.number}
+				{upcomingSeason.label}
+			</span>
+		{/if}
+
 		{#if unreleased}
 			<span
 				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 backdrop-blur-sm ring-inset"

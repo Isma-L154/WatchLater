@@ -31,6 +31,28 @@
 	// "Mark as watched" still works on an unreleased title (premieres exist), but
 	// it shouldn't be the loudest thing on a card for something that isn't out.
 	const unreleased = $derived(getReleaseInfo(item.releaseDate).state !== 'released');
+
+	/**
+	 * A pending season gets the same treatment as an unreleased film: the card
+	 * says when, so "why can't I tick this off" never needs asking.
+	 */
+	const nextSeason = $derived.by(() => {
+		if (item.mediaType !== 'tv' || item.nextSeasonNumber === null) return null;
+		const release = getReleaseInfo(item.nextSeasonAirDate);
+		if (release.state === 'released') return null;
+		return {
+			number: item.nextSeasonNumber,
+			label: release.state === 'upcoming' ? release.shortLabel : 'TBA'
+		};
+	});
+
+	/** The line under the title: progress, or what is coming when caught up. */
+	const note = $derived.by(() => {
+		if (progress.state === 'caughtUp' && nextSeason) {
+			return `Caught up · S${nextSeason.number} ${nextSeason.label}`;
+		}
+		return progress.trackable ? progress.label : undefined;
+	});
 </script>
 
 <MediaCard
@@ -40,7 +62,8 @@
 	voteAverage={item.voteAverage}
 	mediaType={item.mediaType}
 	watched={item.watched}
-	note={progress.trackable ? progress.label : undefined}
+	{note}
+	upcomingSeason={nextSeason}
 	{priority}
 	{onSelect}
 >

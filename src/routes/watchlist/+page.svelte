@@ -37,7 +37,9 @@
 	const EAGER_POSTERS = 6;
 
 	// --- View state (strings, to pair with SegmentedControl) ---
-	let statusTab = $state('all');
+	// Opens on "To watch" rather than everything: the list is here to answer
+	// "what next", and finished titles are the one thing that is never the answer.
+	let statusTab = $state('toWatch');
 	let typeFilter = $state('all');
 	let sortBy = $state('recent');
 	let listQuery = $state('');
@@ -49,11 +51,12 @@
 	/**
 	 * Shows that are started but unfinished, surfaced above the grid.
 	 *
-	 * Only shown on the unfiltered "All" view: once the user has actively narrowed
-	 * the list, a rail that ignores their filter is contradicting them.
+	 * Shown on the default view only: once the user has actively narrowed the
+	 * list, a rail that ignores their filter is contradicting them. In-progress
+	 * shows are unwatched, so they belong under "To watch" as well.
 	 */
 	const continueWatching = $derived(
-		statusTab === 'all' && typeFilter === 'all' && listQuery.trim() === ''
+		statusTab === 'toWatch' && typeFilter === 'all' && listQuery.trim() === ''
 			? data.items.filter(isInProgress)
 			: []
 	);
@@ -77,7 +80,8 @@
 					id: item.id,
 					watched: item.watched,
 					seasonsSeen: item.seasonsSeen,
-					totalSeasons: item.totalSeasons
+					totalSeasons: item.totalSeasons,
+					airedSeasons: item.airedSeasons
 				}
 			])
 		)
@@ -87,12 +91,13 @@
 		selected ? (savedEntries.get(`${selected.tmdbId}:${selected.mediaType}`) ?? null) : null
 	);
 
+	/** True when the view is narrowed past its default landing state. */
 	const filtersActive = $derived(
-		statusTab !== 'all' || typeFilter !== 'all' || listQuery.trim() !== ''
+		statusTab !== 'toWatch' || typeFilter !== 'all' || listQuery.trim() !== ''
 	);
 
 	function resetFilters() {
-		statusTab = 'all';
+		statusTab = 'toWatch';
 		typeFilter = 'all';
 		listQuery = '';
 	}
@@ -113,7 +118,11 @@
 	/**
 	 * Season updates take their message from the server's response rather than
 	 * from the pre-click state: the action may have discovered a newly aired
-	 * season, so only it knows whether the show is actually finished.
+	 * season, so only it knows how far there is left to go.
+	 *
+	 * The wording distinguishes the two ends. "Caught up" means there is nothing
+	 * left *right now*; "Finished" is reserved for a show with nothing still to
+	 * air, which is the only case where it is true.
 	 */
 	function seasonProgressToast(item: Pick<WatchlistItem, 'title'>): SubmitFunction {
 		return () =>
@@ -123,12 +132,17 @@
 					if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
 					return;
 				}
-				const payload = result.data as { seasonsSeen?: number; totalSeasons?: number } | undefined;
+				const payload = result.data as
+					{ seasonsSeen?: number; airedSeasons?: number; totalSeasons?: number | null } | undefined;
 				const seen = payload?.seasonsSeen ?? 0;
-				const total = payload?.totalSeasons ?? 0;
+				const aired = payload?.airedSeasons ?? 0;
+				const total = payload?.totalSeasons ?? aired;
 
-				if (total && seen >= total) toasts.add(`Finished “${item.title}” 🎉`);
-				else if (seen === 0) toasts.add(`Reset progress for “${item.title}”`, 'info');
+				if (aired && seen >= aired) {
+					toasts.add(
+						total > aired ? `Caught up on “${item.title}” 🎉` : `Finished “${item.title}” 🎉`
+					);
+				} else if (seen === 0) toasts.add(`Reset progress for “${item.title}”`, 'info');
 				else toasts.add(`Season ${seen} of “${item.title}” watched`);
 			};
 	}
@@ -254,6 +268,7 @@
 		mediaType={selected.mediaType}
 		saved={selectedSaved}
 		{signedIn}
+		country={page.data.country}
 		onClose={() => (selected = null)}
 	/>
 {/if}

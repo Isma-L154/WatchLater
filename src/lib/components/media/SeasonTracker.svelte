@@ -28,16 +28,21 @@
 
 	let { itemId, title, progress, onSubmit, variant = 'card' }: Props = $props();
 
-	const complete = $derived(progress.state === 'complete');
+	/**
+	 * "Caught up" and "complete" both mean there is nothing left to watch right
+	 * now, so they share the finished styling — but only `complete` means the
+	 * show is over. The distinction is carried by the label.
+	 */
+	const done = $derived(progress.state === 'caughtUp' || progress.state === 'complete');
 	const nextSeason = $derived(progress.seasonsSeen + 1);
 
 	// A finished show still needs a way back, so the primary slot flips to
 	// "rewatch the last season" rather than disappearing.
-	const primaryTarget = $derived(complete ? progress.totalSeasons - 1 : nextSeason);
-	const primaryLabel = $derived(complete ? 'Rewatch' : `Watch S${nextSeason}`);
+	const primaryTarget = $derived(done ? progress.airedSeasons - 1 : nextSeason);
+	const primaryLabel = $derived(done ? 'Rewatch' : `Watch S${nextSeason}`);
 	const primaryDescription = $derived(
-		complete
-			? `Mark the last season of ${title} as unwatched`
+		done
+			? `Mark the last watched season of ${title} as unwatched`
 			: `Mark season ${nextSeason} of ${title} as watched`
 	);
 </script>
@@ -50,11 +55,11 @@
 		     needs it. -->
 		<span
 			title={progress.label}
-			class="flex-shrink-0 text-[11px] font-semibold tabular-nums {complete
+			class="flex-shrink-0 text-[11px] font-semibold tabular-nums {done
 				? 'text-mint'
 				: 'text-ink-muted'}"
 		>
-			{progress.seasonsSeen}/{progress.totalSeasons}
+			{progress.seasonsSeen}/{progress.airedSeasons}
 		</span>
 	</div>
 
@@ -73,17 +78,17 @@
 			title={primaryDescription}
 			aria-label={primaryDescription}
 			class="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]
-				{complete
+				{done
 				? 'bg-mint/15 text-mint hover:bg-mint/25'
 				: 'bg-brand text-white shadow-sm shadow-brand/30 hover:bg-brand-hi'}"
 		>
-			<Icon name={complete ? 'rotate' : 'play'} size={14} filled={!complete} />
+			<Icon name={done ? 'rotate' : 'play'} size={14} filled={!done} />
 			<span class="truncate">{primaryLabel}</span>
 		</button>
 
 		<!-- Step back one season. Hidden at the start, where it would be a
 		     permanently disabled control taking up a third of the row. -->
-		{#if progress.seasonsSeen > 0 && !complete}
+		{#if progress.seasonsSeen > 0 && !done}
 			<button
 				type="submit"
 				name="seasons"

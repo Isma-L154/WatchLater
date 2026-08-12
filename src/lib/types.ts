@@ -40,6 +40,7 @@ export interface SavedEntry {
 	watched: boolean;
 	seasonsSeen: number;
 	totalSeasons: number | null;
+	airedSeasons: number | null;
 }
 
 /** A single cast member, as shown in the detail view. */
@@ -47,6 +48,46 @@ export interface CastMember {
 	name: string;
 	character: string;
 	profilePath: string | null;
+}
+
+/** A streaming service offering a title, for the "where to watch" row. */
+export interface WatchProvider {
+	id: number;
+	name: string;
+	logoPath: string | null;
+}
+
+/**
+ * Where a title can be watched in one country.
+ *
+ * Split by how you pay for it, because the distinction is the whole point: a
+ * title included with a subscription you already have is a different answer to
+ * "what should I watch tonight" than one costing £14 to buy.
+ */
+export interface WatchOptions {
+	/** ISO 3166-1 country the offers apply to. */
+	country: string;
+	/** Included with a subscription. */
+	stream: WatchProvider[];
+	/** Free, ad-supported. */
+	free: WatchProvider[];
+	rent: WatchProvider[];
+	buy: WatchProvider[];
+	/** TMDB's own comparison page, which is what their terms ask us to link to. */
+	link: string | null;
+}
+
+/**
+ * A season that has not premiered yet.
+ *
+ * TMDB counts announced seasons in `number_of_seasons`, so without this a show
+ * with three aired seasons and a fourth announced looks like a four-season show
+ * you could mark as fully watched.
+ */
+export interface UpcomingSeason {
+	number: number;
+	/** `YYYY-MM-DD`, or null when TMDB has no date yet. */
+	airDate: string | null;
 }
 
 /** Rich details for a single title, backing the detail modal. */
@@ -59,8 +100,12 @@ export interface MediaDetails {
 	genres: string[];
 	releaseDate: string | null;
 	runtimeMinutes: number | null;
-	/** TV only: number of seasons. */
+	/** TV only: total seasons, including any announced but not yet aired. */
 	seasons: number | null;
+	/** TV only: how many seasons have actually premiered — the tracking ceiling. */
+	airedSeasons: number | null;
+	/** TV only: the next season still to premiere, if there is one. */
+	upcomingSeason: UpcomingSeason | null;
 	/**
 	 * TMDB production status ("Released", "Post Production", "In Production",
 	 * "Planned", "Returning Series"…). Used to explain *why* a title has no
@@ -73,4 +118,6 @@ export interface MediaDetails {
 	cast: CastMember[];
 	/** YouTube video key for the trailer, if one exists. */
 	trailerKey: string | null;
+	/** Where to watch it in the requesting visitor's country, when TMDB knows. */
+	watch: WatchOptions | null;
 }

@@ -15,7 +15,7 @@ const CACHE_CONTROL = 'public, max-age=600, s-maxage=21600, stale-while-revalida
  * Server-side proxy for a single title's full details (genres, cast, trailer).
  * Keeps the TMDB access token on the server.
  */
-export const GET: RequestHandler = async ({ params }) => {
+export const GET: RequestHandler = async ({ params, url }) => {
 	const { type, id } = params;
 	const tmdbId = Number(id);
 
@@ -23,11 +23,27 @@ export const GET: RequestHandler = async ({ params }) => {
 		error(400, 'Invalid media type or id.');
 	}
 
+	/**
+	 * Country travels in the query string, not in a header.
+	 *
+	 * The response is publicly cached, and the cache key is the URL — so reading
+	 * the visitor's country from `CF-IPCountry` here would let one country's
+	 * streaming offers be served to every later visitor who hit the same edge.
+	 * As a query parameter it is part of the key, and each country caches apart.
+	 */
+	const country = normalizeCountry(url.searchParams.get('country'));
+
 	try {
-		const details = await getDetails(type, tmdbId);
+		const details = await getDetails(type, tmdbId, country);
 		return json(details, { headers: { 'cache-control': CACHE_CONTROL } });
 	} catch (err) {
 		console.error('TMDB details failed:', err);
 		error(502, 'Failed to load title details. Please try again.');
 	}
 };
+
+/** Two ASCII letters or nothing — this becomes part of a public cache key. */
+function normalizeCountry(value: string | null): string {
+	const country = (value ?? '').toUpperCase();
+	return /^[A-Z]{2}$/.test(country) ? country : 'US';
+}
