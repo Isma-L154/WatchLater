@@ -60,13 +60,21 @@ async function loadSavedIndex(userId: string | undefined): Promise<Record<string
 	);
 }
 
-/** Trending is best-effort: a TMDB outage should degrade the page, not break it. */
-async function loadTrending(): Promise<MediaResult[]> {
+/**
+ * The first page of trending, rendered with the document.
+ *
+ * Further pages are fetched on demand from `/api/trending` when the visitor asks
+ * for them, so the initial paint never pays for titles below the fold.
+ *
+ * Best-effort: a TMDB outage should degrade the page, not break it.
+ */
+async function loadTrending(): Promise<{ items: MediaResult[]; hasMore: boolean }> {
 	try {
-		return await getTrending();
+		const { results, hasMore } = await getTrending(1);
+		return { items: results, hasMore };
 	} catch (err) {
 		console.error('Failed to load trending titles:', err);
-		return [];
+		return { items: [], hasMore: false };
 	}
 }
 

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -12,7 +13,9 @@
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
+	import { TrendingFeed } from '$lib/stores/trending.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { dedupeByKey, mediaKey } from '$lib/domain/media';
 	import type { MediaType } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -39,11 +42,28 @@
 	 */
 	const EAGER_POSTERS = 6;
 
+	/**
+	 * Owns pages 2..n; page 1 stays with the server load.
+	 *
+	 * `untrack` states the intent the compiler asks about: the flag is a starting
+	 * point, not a binding. Rebuilding the feed whenever `data` changes would
+	 * throw away every page the visitor had loaded each time they saved a title.
+	 */
+	const trending = untrack(() => new TrendingFeed(data.trending.hasMore));
+
+	/**
+	 * Merge the server's page 1 with the pages loaded since.
+	 *
+	 * Saving a title invalidates the page data, so page 1 is re-fetched — and the
+	 * trending list is re-ranked continuously, so a title sitting in `extra` can
+	 * reappear in the refreshed page 1. The grid is keyed by title, and a
+	 * duplicate key is a render error, not a cosmetic glitch.
+	 */
+	const allTrending = $derived(dedupeByKey([...data.trending.items, ...trending.extra]));
+
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
 
-	const selectedSaved = $derived(
-		selected ? (data.saved[`${selected.tmdbId}:${selected.mediaType}`] ?? null) : null
-	);
+	const selectedSaved = $derived(selected ? (data.saved[mediaKey(selected)] ?? null) : null);
 
 	/**
 	 * Surface the outcome of the OAuth round-trip, which comes back as a query
@@ -70,10 +90,6 @@
 				if (result.type === 'success') toasts.add(message, type);
 				else if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
 			};
-	}
-
-	function saveKey(tmdbId: number, mediaType: string): string {
-		return `${tmdbId}:${mediaType}`;
 	}
 </script>
 
@@ -113,12 +129,12 @@
 				<PosterGridSkeleton />
 			{:else if search.results.length > 0}
 				<PosterGrid>
-					{#each search.results as item, index (saveKey(item.tmdbId, item.mediaType))}
+					{#each search.results as item, index (mediaKey(item))}
 						<DiscoverCard
 							{item}
 							{signedIn}
 							priority={index < EAGER_POSTERS}
-							saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
+							saved={data.saved[mediaKey(item)] ?? null}
 							onSelect={() => (selected = item)}
 							onSubmit={withToast(`Added “${item.title}”`)}
 						/>
@@ -131,23 +147,50 @@
 					hint="Try a shorter title, or check the spelling."
 				/>
 			{/if}
-		{:else if data.trending.length > 0}
+		{:else if allTrending.length > 0}
 			<div class="mb-3 flex items-center gap-2">
 				<Icon name="flame" size={16} class="text-amber" />
 				<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Trending this week</h2>
+				<span class="text-xs text-ink-faint">{allTrending.length}</span>
 			</div>
 			<PosterGrid>
-				{#each data.trending as item, index (saveKey(item.tmdbId, item.mediaType))}
+				{#each allTrending as item, index (mediaKey(item))}
 					<DiscoverCard
 						{item}
 						{signedIn}
 						priority={index < EAGER_POSTERS}
-						saved={data.saved[saveKey(item.tmdbId, item.mediaType)] ?? null}
+						saved={data.saved[mediaKey(item)] ?? null}
 						onSelect={() => (selected = item)}
 						onSubmit={withToast(`Added “${item.title}”`)}
 					/>
 				{/each}
 			</PosterGrid>
+
+			{#if trending.hasMore}
+				<div class="mt-6 flex flex-col items-center gap-2">
+					{#if trending.error}
+						<p class="flex items-center gap-2 text-sm text-rose" role="alert">
+							<Icon name="alert" size={15} />
+							{trending.error}
+						</p>
+					{/if}
+					<button
+						type="button"
+						onclick={trending.loadMore}
+						disabled={trending.loading}
+						class="flex min-h-[44px] cursor-pointer items-center justify-center gap-2 rounded-xl bg-surface px-6 text-sm font-semibold text-ink ring-1 ring-line transition-colors duration-200 hover:bg-surface-hi disabled:cursor-not-allowed disabled:opacity-60"
+					>
+						{#if trending.loading}
+							<span class="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand-hi"
+							></span>
+							Loading…
+						{:else}
+							<Icon name="plus" size={15} stroke={2.5} />
+							{trending.error ? 'Try again' : 'Load more'}
+						{/if}
+					</button>
+				</div>
+			{/if}
 		{:else}
 			<EmptyState
 				icon="alert"
