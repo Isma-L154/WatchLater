@@ -10,11 +10,13 @@ A fast, lightweight web app to search movies & TV shows (via [TMDB](https://www.
 
 - 🔐 **Sign in with Google** — each watchlist is private and tied to its owner's account.
 - 🔍 **Live search** of movies and TV shows (debounced, powered by TMDB multi-search).
-- 🔥 **Trending this week** on the home screen (server-rendered, instant).
+- 🔥 **Trending this week** — the first page server-rendered for an instant paint, the rest loaded on demand.
 - 🗂️ **Watchlist management** — add, remove, and mark titles as watched.
-- 📺 **Season progress for TV** — track multi-season shows season by season; finishing the last one marks the show as watched automatically ([design notes](docs/season-progress.md)).
-- ⏳ **Unreleased titles are called out** — TMDB indexes films long before they open, so anything not out yet carries an amber countdown badge and an "Upcoming" filter.
-- 🎛️ **Tabs, filters & sorting** — All / To Watch / Watching / Upcoming / Watched, Movie / TV filter, and sort options.
+- 📺 **Season progress for TV** — track multi-season shows season by season ([design notes](docs/season-progress.md)). Seasons that have not aired are shown but cannot be ticked off, so a show can never be marked watched ahead of broadcast; finishing the aired ones marks you _caught up_, and a new season brings the show back on its own.
+- 📡 **Where to watch** — streaming, rental and purchase options for your own country, resolved at the edge.
+- ⏳ **Coming soon** — films that have not opened and seasons that have not premiered, grouped by how soon (this week / this month / later / no date).
+- 🧹 **Auto-archive** — optionally tidy watched titles away after 7, 30 or 90 days. Archived, never deleted, and never applied to a show with a season still to come.
+- 🎛️ **Tabs, filters & sorting** — To Watch / Watching / Upcoming / Watched / Archived, a Movie / TV filter, and sort options.
 - 🎞️ **Detail view** — a modal with backdrop, embedded YouTube trailer, genres, synopsis, and cast.
 - 🔔 **Toasts, skeletons, and smooth animations** for a polished feel.
 - 🔒 **Secure by design** — the TMDB token and OAuth secret never reach the browser; all TMDB calls are proxied server-side.
@@ -108,6 +110,69 @@ are stored — the access token is used once, during the callback, and discarded
 - **E2E (Playwright):** smoke tests that drive the running app (`e2e/*.e2e.ts`). They run against the dev server and therefore need a local `.env`, so they are a manual/local step (not part of CI). Run with `npm run test:e2e`.
 - **CI (GitHub Actions):** `.github/workflows/ci.yml` runs Prettier, ESLint, `svelte-check` and the unit tests on every push and pull request to `main` / `dev`. A push to `main` that clears those checks then deploys to Cloudflare — pull requests never do, so a fork cannot publish to production.
 
+## 🏗️ Architecture
+
+The browser talks to exactly one thing: a Cloudflare Worker running the whole
+SvelteKit app at the edge. Every credential — the TMDB token, the database
+token, the Google client secret — lives inside that box and is never shipped to
+the client.
+
+```mermaid
+flowchart TB
+    B["🖥️ Browser<br/>Discover · My List"]
+    G["🔑 Google OAuth"]
+
+    subgraph CF ["☁️ Cloudflare Worker — every secret stays inside"]
+        R["Routes<br/>SSR page loads · form actions"]
+        P["/api proxies<br/>search · trending · details"]
+    end
+
+    D[("🗄️ Turso · libSQL<br/>user · session · watchlist_item")]
+    T["🎬 TMDB API"]
+
+    B -->|"HTML · form POSTs"| R
+    B -->|"JSON"| P
+    G -.->|"PKCE + state"| R
+    R <--> D
+    R --> T
+    P --> T
+```
+
+Two rules decide where a request goes and how it may be cached:
+
+| Data                               | Route         | Caching                                                                                                                       |
+| ---------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Identical for everyone (TMDB)      | `/api/*`      | Cached at the edge — country is part of the URL, never a header, so one visitor's streaming offers can't be served to another |
+| Personal (your list, your session) | SSR + actions | `private, no-store` — never touches a shared cache                                                                            |
+
+### Upkeep happens on read, not on a schedule
+
+There is no cron job. Two pieces of maintenance ride along with the page load
+that needs them, which is why the list keeps itself correct without any
+background infrastructure:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant W as Worker
+    participant D as Turso
+    participant T as TMDB
+
+    B->>W: GET /watchlist
+    W->>D: load rows
+    Note over W,T: only stale rows, max 8 per load
+    W->>T: re-resolve seasons
+    W->>D: write aired counts + next air dates
+    Note over W,D: after the refresh, so a show that<br/>just gained a season is safe
+    W->>D: archive watched titles past their window
+    W-->>B: one render, already up to date
+```
+
+That ordering is the whole trick. A show you are caught up on counts as watched,
+so archiving it _before_ checking whether a new season aired would tidy away the
+very title you were waiting for.
+
 ## 🗂️ Project Structure
 
 ```
@@ -117,25 +182,30 @@ src/
 │  ├─ components/
 │  │  ├─ auth/           # GoogleButton, AccountChip
 │  │  ├─ media/          # Anything that renders a title: cards, modal, season tracking
-│  │  └─ ui/             # App chrome and generic primitives
+│  │  └─ ui/             # App chrome (AppShell, Icon) and generic primitives
 │  ├─ domain/            # Pure business rules — no DOM, no DB, unit-tested
-│  │  ├─ progress.ts     # Season tracking: state, clamping, watched invariant
+│  │  ├─ archive.ts      # Auto-archive eligibility, countdown, safety rules
+│  │  ├─ media.ts        # Title identity: stable keys and dedupe
+│  │  ├─ progress.ts     # Season tracking: aired ceiling, caught-up vs finished
 │  │  ├─ release.ts      # Release-date reasoning (released / upcoming / TBA)
+│  │  ├─ upcoming.ts     # What a title is still waiting on, grouped by how soon
 │  │  └─ watchlist.ts    # List filtering, sorting and status counts
 │  ├─ server/            # Never reaches the browser (SvelteKit enforces this)
 │  │  ├─ db/             # Drizzle client + schema
 │  │  ├─ auth.ts         # Session create/validate/revoke + cookie helpers
 │  │  ├─ oauth.ts        # Google OAuth client — client secret stays here
-│  │  └─ tmdb.ts         # TMDB proxy (search, trending, details) — token stays here
-│  ├─ stores/            # Svelte 5 rune stores (search, toasts)
+│  │  ├─ tmdb.ts         # TMDB proxy + season/provider parsing — token stays here
+│  │  └─ watchlist.ts    # Shared form actions, read-path refresh and archiving
+│  ├─ stores/            # Svelte 5 rune stores (search, trending paging, toasts)
 │  ├─ tmdb-image.ts      # Client-safe image URL helpers
 │  └─ types.ts           # Shared, client-safe types
 └─ routes/
-   ├─ +layout.server.ts  # Exposes the signed-in user to every page
-   ├─ +page.svelte       # Home — composition only; behaviour lives in $lib
-   ├─ +page.server.ts    # Loads the list; add/remove/toggle/setSeasons actions
+   ├─ +layout.server.ts  # Signed-in user, watchlist count, edge-resolved country
+   ├─ +page.svelte       # Discover — composition only; behaviour lives in $lib
+   ├─ +page.server.ts    # Trending page 1 + saved-state index
+   ├─ watchlist/         # My List — the saved titles and everything done to them
    ├─ auth/              # /auth/google, /auth/google/callback, /auth/logout
-   └─ api/               # /api/search, /api/details/[type]/[id]
+   └─ api/               # /api/search, /api/trending, /api/details/[type]/[id]
 ```
 
 Three rules keep this navigable as it grows:
