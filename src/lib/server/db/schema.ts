@@ -22,6 +22,15 @@ export const user = sqliteTable('user', {
 	name: text('name').notNull(),
 	avatarUrl: text('avatar_url'),
 
+	/**
+	 * How many days a watched title stays on the list before it is archived.
+	 *
+	 * Null means the feature is off, which is the default and stays the default:
+	 * quietly clearing someone's list on their behalf is not a thing to opt them
+	 * into. See `domain/archive` for what is eligible.
+	 */
+	autoArchiveDays: integer('auto_archive_days'),
+
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.$defaultFn(() => new Date())
@@ -110,6 +119,21 @@ export const watchlistItem = sqliteTable(
 		airedSeasons: integer('aired_seasons'),
 		nextSeasonNumber: integer('next_season_number'),
 		nextSeasonAirDate: text('next_season_air_date'),
+
+		/**
+		 * When the entry became watched, and when it was archived.
+		 *
+		 * `watchedAt` is the clock auto-archiving runs on, so it is stamped on the
+		 * transition into watched and cleared on the way out — `addedAt` cannot
+		 * stand in for it, since when you saved something says nothing about when
+		 * you got round to it.
+		 *
+		 * `archivedAt` set means the row is hidden from every normal view but still
+		 * there. Archiving is deliberately not deletion: the point is an
+		 * uncluttered list, and that does not require destroying anything.
+		 */
+		watchedAt: integer('watched_at', { mode: 'timestamp' }),
+		archivedAt: integer('archived_at', { mode: 'timestamp' }),
 
 		addedAt: integer('added_at', { mode: 'timestamp' })
 			.notNull()

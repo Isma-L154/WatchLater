@@ -6,6 +6,11 @@
 	import SeasonTracker from './SeasonTracker.svelte';
 	import { getSeasonProgress } from '$lib/domain/progress';
 	import { getReleaseInfo } from '$lib/domain/release';
+	import {
+		daysUntilArchive,
+		shouldWarnAboutArchive,
+		type ArchiveWindow
+	} from '$lib/domain/archive';
 	import type { WatchlistItem } from '$lib/server/db/schema';
 
 	/**
@@ -18,13 +23,42 @@
 		item: WatchlistItem;
 		/** Forwarded to the poster; set for the tiles above the fold. */
 		priority?: boolean;
+		/** The account's auto-archive window, or null when the feature is off. */
+		archiveWindow?: ArchiveWindow | null;
 		onSelect: () => void;
 		onToggle: SubmitFunction;
 		onSetSeasons: SubmitFunction;
 		onRemove: SubmitFunction;
+		/** Resets the archive countdown. Required once `archiveWindow` is set. */
+		onKeep?: SubmitFunction;
+		/** Brings an archived title back. Only rendered for archived entries. */
+		onRestore?: SubmitFunction;
 	}
 
-	let { item, priority = false, onSelect, onToggle, onSetSeasons, onRemove }: Props = $props();
+	let {
+		item,
+		priority = false,
+		archiveWindow = null,
+		onSelect,
+		onToggle,
+		onSetSeasons,
+		onRemove,
+		onKeep,
+		onRestore
+	}: Props = $props();
+
+	const archived = $derived(item.archivedAt !== null);
+
+	/**
+	 * Days left before this is tidied away, shown only inside the final week.
+	 *
+	 * A countdown on something with a month to go would sit on every watched card
+	 * permanently and stop being read; the point is that nothing disappears
+	 * without having said so first.
+	 */
+	const archiveCountdown = $derived(
+		shouldWarnAboutArchive(item, archiveWindow) ? daysUntilArchive(item, archiveWindow) : null
+	);
 
 	const progress = $derived(getSeasonProgress(item));
 
@@ -68,7 +102,19 @@
 	{onSelect}
 >
 	{#snippet actions()}
-		{#if progress.trackable}
+		{#if archived}
+			<!-- An archived tile carries one action, because there is only one thing
+			     worth doing with it: putting it back. -->
+			<form method="POST" action="?/restore" use:enhance={onRestore}>
+				<input type="hidden" name="id" value={item.id} />
+				<button
+					type="submit"
+					class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-surface-hi text-xs font-semibold text-ink ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line active:scale-[0.98]"
+				>
+					<Icon name="rotate" size={14} /> Restore
+				</button>
+			</form>
+		{:else if progress.trackable}
 			<!-- The tracker is a full-width row of its own: cramming it beside the
 			     remove button would leave the primary action too narrow to name the
 			     next season, which is the whole point of it. -->
@@ -113,6 +159,25 @@
 					</button>
 				</form>
 			</div>
+		{/if}
+
+		<!--
+			The warning is deliberately actionable rather than informational: telling
+			someone their title is about to disappear without offering the one-tap way
+			to stop it would be a notification, not a control.
+		-->
+		{#if archiveCountdown !== null && onKeep}
+			<form method="POST" action="?/keepLonger" use:enhance={onKeep} class="mt-1.5">
+				<input type="hidden" name="id" value={item.id} />
+				<button
+					type="submit"
+					class="flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-amber/10 py-1 text-[11px] font-medium text-amber transition-colors duration-200 hover:bg-amber/20"
+					title={`Archives in ${archiveCountdown} day${archiveCountdown === 1 ? '' : 's'} — tap to keep it on your list`}
+				>
+					<Icon name="clock" size={11} />
+					{archiveCountdown === 0 ? 'Archives today' : `Archives in ${archiveCountdown}d`} · Keep
+				</button>
+			</form>
 		{/if}
 	{/snippet}
 </MediaCard>

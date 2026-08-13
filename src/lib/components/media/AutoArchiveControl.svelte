@@ -1,0 +1,88 @@
+<script lang="ts">
+	import { enhance } from '$app/forms';
+	import type { SubmitFunction } from '@sveltejs/kit';
+	import Icon from '$lib/components/ui/Icon.svelte';
+	import { toasts } from '$lib/stores/toasts.svelte';
+	import { ARCHIVE_WINDOWS, type ArchiveWindow } from '$lib/domain/archive';
+
+	/**
+	 * Chooses how long watched titles stay before they are archived.
+	 *
+	 * Lives inside the Watched tab rather than in a settings screen: this is the
+	 * one place the setting has any visible consequence, and a preference you meet
+	 * where it applies needs no explaining.
+	 *
+	 * Defaults to off, and says plainly that archiving is not deletion — an
+	 * automatic rule that removes things from your list has to be legible before
+	 * it is convenient.
+	 */
+	interface Props {
+		current: ArchiveWindow | null;
+		archivedCount: number;
+		onShowArchived: () => void;
+	}
+
+	let { current, archivedCount, onShowArchived }: Props = $props();
+
+	let form = $state<HTMLFormElement | null>(null);
+
+	const onSubmit: SubmitFunction = () => {
+		return async ({ result, update }) => {
+			await update();
+			if (result.type !== 'success') {
+				if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
+				return;
+			}
+			const days = (result.data as { autoArchiveDays?: number | null } | undefined)
+				?.autoArchiveDays;
+			toasts.add(
+				days ? `Watched titles will archive after ${days} days` : 'Auto-archive turned off',
+				'info'
+			);
+		};
+	};
+</script>
+
+<div
+	class="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-surface/60 px-3.5 py-2.5 ring-1 ring-line"
+>
+	<Icon name="clock" size={15} class="text-ink-faint" />
+
+	<form
+		bind:this={form}
+		method="POST"
+		action="?/setAutoArchive"
+		use:enhance={onSubmit}
+		class="flex items-center gap-2"
+	>
+		<label class="flex items-center gap-2 text-xs text-ink-muted sm:text-sm">
+			Archive watched titles after
+			<select
+				name="days"
+				value={current ?? ''}
+				onchange={() => form?.requestSubmit()}
+				class="cursor-pointer appearance-none rounded-lg bg-surface-hi py-1.5 pr-7 pl-2.5 text-xs font-semibold text-ink ring-1 ring-line transition-colors duration-200 hover:bg-line sm:text-sm"
+			>
+				<option value="">never</option>
+				{#each ARCHIVE_WINDOWS as days (days)}
+					<option value={days}>{days} days</option>
+				{/each}
+			</select>
+		</label>
+		<!-- Works without JavaScript; the select just submits it automatically. -->
+		<noscript><button type="submit" class="text-xs underline">Save</button></noscript>
+	</form>
+
+	<p class="w-full text-[11px] text-ink-faint sm:w-auto sm:flex-1">
+		Archived titles are hidden, not deleted — you can restore them any time.
+		{#if archivedCount > 0}
+			<button
+				type="button"
+				onclick={onShowArchived}
+				class="cursor-pointer font-semibold text-brand-hi underline-offset-2 hover:underline"
+			>
+				View {archivedCount} archived
+			</button>
+		{/if}
+	</p>
+</div>

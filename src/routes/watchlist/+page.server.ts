@@ -1,9 +1,14 @@
+import { eq } from 'drizzle-orm';
+import { getDb } from '$lib/server/db';
+import { user } from '$lib/server/db/schema';
 import {
-	refreshSeasonData,
+	archiveExpired,
 	loadWatchlist,
+	refreshSeasonData,
 	watchlistActions,
 	type WatchlistRow
 } from '$lib/server/watchlist';
+import { normalizeArchiveWindow } from '$lib/domain/archive';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
@@ -15,16 +20,28 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	// Typed rather than a bare `[]`: an untyped empty array widens the union the
 	// page sees to `never[]`, which breaks inference on every helper downstream.
-	if (!locals.user) return { items: [] as WatchlistRow[] };
+	if (!locals.user) return { items: [] as WatchlistRow[], autoArchiveDays: null };
+
+	const [row] = await getDb()
+		.select({ autoArchiveDays: user.autoArchiveDays })
+		.from(user)
+		.where(eq(user.id, locals.user.id))
+		.limit(1);
+	const autoArchiveDays = normalizeArchiveWindow(row?.autoArchiveDays);
 
 	/**
-	 * Resolve-on-read: shows saved before air dates were tracked have no aired
-	 * count (which silently disables the tracker), and shows whose next season has
-	 * since premiered are stale in a way the viewer would notice. See the function
-	 * for why this lives on the read path.
+	 * Two pieces of upkeep, both on the read path so there is no scheduled job to
+	 * own. Season data is resolved first because archiving reads it: a show that
+	 * just gained a season must stop being eligible *before* the archive rule
+	 * looks at it, or being caught up would tidy away the very title whose next
+	 * season is now airing.
 	 */
-	const items = await refreshSeasonData(await loadWatchlist(locals.user.id));
-	return { items };
+	const items = await archiveExpired(
+		await refreshSeasonData(await loadWatchlist(locals.user.id)),
+		autoArchiveDays
+	);
+
+	return { items, autoArchiveDays };
 };
 
 export const actions: Actions = watchlistActions;

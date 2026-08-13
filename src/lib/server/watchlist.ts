@@ -1,7 +1,7 @@
 import { fail } from '@sveltejs/kit';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { getDb } from './db';
-import { watchlistItem } from './db/schema';
+import { user, watchlistItem } from './db/schema';
 import { getDetails } from './tmdb';
 import {
 	clampSeasons,
@@ -9,6 +9,7 @@ import {
 	normalizeAiredSeasons,
 	normalizeTotalSeasons
 } from '$lib/domain/progress';
+import { isDueForArchive, normalizeArchiveWindow, type ArchiveWindow } from '$lib/domain/archive';
 import type { MediaType } from '$lib/types';
 import type { Actions } from '@sveltejs/kit';
 
@@ -51,7 +52,13 @@ const BACKFILL_BATCH_SIZE = 8;
  */
 const NO_SEASON_DATA = 0;
 
-/** The signed-in user's list, newest first. */
+/**
+ * The signed-in user's list, newest first.
+ *
+ * Archived rows are included: they are a view the UI can switch to, not deleted
+ * data, and splitting them into a second query would mean two round-trips for
+ * one screen. Every default view filters them out — see `domain/watchlist`.
+ */
 export async function loadWatchlist(userId: string) {
 	return getDb()
 		.select()
@@ -60,13 +67,59 @@ export async function loadWatchlist(userId: string) {
 		.orderBy(desc(watchlistItem.addedAt));
 }
 
-/** How many titles are saved, for the navigation badge. */
+/**
+ * How many titles are saved, for the navigation badge.
+ *
+ * Archived rows are excluded — the badge is a count of the list you are working
+ * with, and including things you deliberately tidied away would defeat the
+ * point of tidying them away.
+ */
 export async function countWatchlist(userId: string): Promise<number> {
 	const [row] = await getDb()
 		.select({ total: sql<number>`count(*)` })
 		.from(watchlistItem)
-		.where(eq(watchlistItem.userId, userId));
+		.where(and(eq(watchlistItem.userId, userId), isNull(watchlistItem.archivedAt)));
 	return Number(row?.total ?? 0);
+}
+
+/**
+ * The `watchedAt` value to store alongside a new watched state.
+ *
+ * Preserves an existing timestamp when something is already watched, so
+ * re-deriving the flag — which the season refresh does on every visit — cannot
+ * silently push the archive countdown back to the start.
+ */
+function watchedStamp(nextWatched: boolean, current: Date | null, now = new Date()): Date | null {
+	if (!nextWatched) return null;
+	return current ?? now;
+}
+
+/**
+ * Archive watched entries whose window has elapsed, returning the patched list.
+ *
+ * Runs on read, like the season refresh, so there is no scheduled job to operate
+ * — and no way for the rule to fire against a list nobody is looking at. The
+ * eligibility rules, including the one that spares any show with a season still
+ * to come, live in `domain/archive` where they are unit-tested.
+ */
+export async function archiveExpired(
+	items: WatchlistRow[],
+	window: ArchiveWindow | null
+): Promise<WatchlistRow[]> {
+	if (window === null) return items;
+
+	const now = new Date();
+	const due = items.filter((item) => isDueForArchive(item, window, now));
+	if (due.length === 0) return items;
+
+	const ids = due.map((item) => item.id);
+	await getDb()
+		.update(watchlistItem)
+		.set({ archivedAt: now })
+		.where(inArray(watchlistItem.id, ids));
+
+	const archived = new Set(ids);
+	return items.map((item) => (archived.has(item.id) ? { ...item, archivedAt: now } : item));
 }
 
 export type WatchlistRow = Awaited<ReturnType<typeof loadWatchlist>>[number];
@@ -139,13 +192,15 @@ export async function refreshSeasonData(items: WatchlistRow[]): Promise<Watchlis
 			 * never touched — they did watch those seasons.
 			 */
 			const seasonsSeen = clampSeasons(source.seasonsSeen, info.airedSeasons);
+			const watched = deriveWatched(seasonsSeen, info.airedSeasons);
 			const patch = {
 				totalSeasons: info.totalSeasons,
 				airedSeasons: info.airedSeasons,
 				nextSeasonNumber: info.nextSeasonNumber,
 				nextSeasonAirDate: info.nextSeasonAirDate,
 				seasonsSeen,
-				watched: deriveWatched(seasonsSeen, info.airedSeasons)
+				watched,
+				watchedAt: watchedStamp(watched, source.watchedAt)
 			};
 
 			patches.set(id, patch);
@@ -245,6 +300,7 @@ export const watchlistActions = {
 		const [item] = await db
 			.select({
 				watched: watchlistItem.watched,
+				watchedAt: watchlistItem.watchedAt,
 				totalSeasons: watchlistItem.totalSeasons,
 				airedSeasons: watchlistItem.airedSeasons
 			})
@@ -261,11 +317,67 @@ export const watchlistActions = {
 			.update(watchlistItem)
 			.set({
 				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt),
 				...(ceiling ? { seasonsSeen: watched ? ceiling : Math.max(ceiling - 1, 0) } : {})
 			})
 			.where(ownedRow(id, locals.user.id));
 
 		return { toggled: true, watched };
+	},
+
+	/**
+	 * Choose how long a watched title stays before it is archived, or turn the
+	 * whole thing off.
+	 *
+	 * Anything that is not one of the offered windows is stored as null — "off" —
+	 * rather than rejected, because the failure mode of a bad value here is
+	 * someone's list being tidied on a schedule they never picked.
+	 */
+	setAutoArchive: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const days = normalizeArchiveWindow(form.get('days'));
+
+		await getDb().update(user).set({ autoArchiveDays: days }).where(eq(user.id, locals.user.id));
+		return { autoArchiveDays: days };
+	},
+
+	/** Bring an archived title back onto the list. */
+	restore: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		/**
+		 * The watched clock restarts on restore. Otherwise a title pulled back
+		 * would still be weeks overdue and get archived again on the very next
+		 * page load — which reads as the restore having silently failed.
+		 */
+		await getDb()
+			.update(watchlistItem)
+			.set({ archivedAt: null, watchedAt: new Date() })
+			.where(ownedRow(id, locals.user.id));
+
+		return { restored: true };
+	},
+
+	/** Reset the archive countdown for a title without changing anything else. */
+	keepLonger: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		await getDb()
+			.update(watchlistItem)
+			.set({ watchedAt: new Date() })
+			.where(ownedRow(id, locals.user.id));
+
+		return { kept: true };
 	},
 
 	/**
@@ -289,6 +401,7 @@ export const watchlistActions = {
 			.select({
 				tmdbId: watchlistItem.tmdbId,
 				mediaType: watchlistItem.mediaType,
+				watchedAt: watchlistItem.watchedAt,
 				totalSeasons: watchlistItem.totalSeasons,
 				airedSeasons: watchlistItem.airedSeasons
 			})
@@ -320,6 +433,7 @@ export const watchlistActions = {
 		 * the last one that actually exists instead of being honoured.
 		 */
 		const seasonsSeen = clampSeasons(requested, airedSeasons);
+		const watched = deriveWatched(seasonsSeen, airedSeasons);
 
 		// Only a fresh lookup may touch the descriptive columns — writing them from
 		// a skipped one would blank the row with nulls it never learned.
@@ -328,7 +442,8 @@ export const watchlistActions = {
 			.set({
 				seasonsSeen,
 				airedSeasons,
-				watched: deriveWatched(seasonsSeen, airedSeasons),
+				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt),
 				...(fresh && {
 					totalSeasons: fresh.totalSeasons,
 					nextSeasonNumber: fresh.nextSeasonNumber,
