@@ -13,6 +13,8 @@ const entry = (over: Partial<WatchlistEntry> & { title: string }): WatchlistEntr
 	seasonsSeen: 0,
 	totalSeasons: null,
 	airedSeasons: null,
+	nextSeasonNumber: null,
+	nextSeasonAirDate: null,
 	...over
 });
 

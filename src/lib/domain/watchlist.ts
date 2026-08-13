@@ -1,5 +1,5 @@
 import { isTrackable } from './progress';
-import { getReleaseInfo, isUpcoming } from './release';
+import { hasUpcoming, upcomingSortKey } from './upcoming';
 import type { MediaType } from '../types';
 
 /**
@@ -17,6 +17,9 @@ export interface WatchlistEntry {
 	seasonsSeen: number;
 	totalSeasons: number | null;
 	airedSeasons: number | null;
+	/** The next season still to premiere; null when there is none. */
+	nextSeasonNumber: number | null;
+	nextSeasonAirDate: string | null;
 }
 
 /** Current view options coming from the UI controls. */
@@ -51,7 +54,7 @@ export function applyWatchlistView<T extends WatchlistEntry>(
 			view.status === 'all' ||
 			(view.status === 'toWatch' && !item.watched) ||
 			(view.status === 'watched' && item.watched) ||
-			(view.status === 'upcoming' && isUpcoming(item.releaseDate, now)) ||
+			(view.status === 'upcoming' && hasUpcoming(item, now)) ||
 			(view.status === 'inProgress' && isInProgress(item));
 		const matchesType = view.type === 'all' || item.mediaType === view.type;
 		const matchesQuery = query === '' || item.title.toLowerCase().includes(query);
@@ -65,8 +68,9 @@ export function applyWatchlistView<T extends WatchlistEntry>(
 	} else if (view.sort === 'title') {
 		sorted.sort((a, b) => a.title.localeCompare(b.title));
 	} else if (view.sort === 'soonest') {
-		// Nearest release first; already-released and undated titles go last.
-		sorted.sort((a, b) => releaseSortKey(a, now) - releaseSortKey(b, now));
+		// Nearest thing first, whether that is a premiere or a new season;
+		// already-available and undated titles go last.
+		sorted.sort((a, b) => upcomingSortKey(a, now) - upcomingSortKey(b, now));
 	}
 	return sorted;
 }
@@ -93,12 +97,7 @@ export function countByStatus(
 	for (const item of items) {
 		if (item.watched) watched++;
 		if (isInProgress(item)) inProgress++;
-		if (isUpcoming(item.releaseDate, now)) upcoming++;
+		if (hasUpcoming(item, now)) upcoming++;
 	}
 	return { all: items.length, toWatch: items.length - watched, inProgress, upcoming, watched };
-}
-
-/** Sort key for "coming soon": days until release, or Infinity when not upcoming. */
-function releaseSortKey(item: WatchlistEntry, now: Date): number {
-	return getReleaseInfo(item.releaseDate, now).daysUntil ?? Number.POSITIVE_INFINITY;
 }

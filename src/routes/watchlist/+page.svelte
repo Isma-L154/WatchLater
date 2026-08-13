@@ -11,6 +11,7 @@
 	import WatchlistCard from '$lib/components/media/WatchlistCard.svelte';
 	import WatchlistToolbar from '$lib/components/media/WatchlistToolbar.svelte';
 	import ContinueWatching from '$lib/components/media/ContinueWatching.svelte';
+	import ComingSoon from '$lib/components/media/ComingSoon.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { applyWatchlistView, countByStatus, isInProgress } from '$lib/domain/watchlist';
@@ -240,24 +241,39 @@
 					Showing {visibleItems.length} of {counts.all}
 				</p>
 			{/if}
-			<PosterGrid>
-				{#each visibleItems as item, index (item.id)}
-					<div
-						animate:flip={{ duration: 250 }}
-						in:fade={{ duration: 200 }}
-						out:fade={{ duration: 150 }}
-					>
-						<WatchlistCard
-							{item}
-							priority={index < EAGER_POSTERS}
-							onSelect={() => (selected = item)}
-							onToggle={withToast(item.watched ? 'Moved back to your list' : 'Marked as watched')}
-							onSetSeasons={seasonProgressToast(item)}
-							onRemove={withToast(`Removed “${item.title}”`, 'info')}
-						/>
-					</div>
-				{/each}
-			</PosterGrid>
+
+			{#if statusTab === 'upcoming'}
+				<!-- The one tab where the date *is* the content, so it groups by how
+				     soon rather than laying everything out in one undifferentiated grid. -->
+				<ComingSoon
+					items={visibleItems}
+					eagerPosters={EAGER_POSTERS}
+					onSelect={(item) => (selected = item)}
+					onToggle={(item) =>
+						withToast(item.watched ? 'Moved back to your list' : 'Marked as watched')}
+					onSetSeasons={seasonProgressToast}
+					onRemove={(item) => withToast(`Removed “${item.title}”`, 'info')}
+				/>
+			{:else}
+				<PosterGrid>
+					{#each visibleItems as item, index (item.id)}
+						<div
+							animate:flip={{ duration: 250 }}
+							in:fade={{ duration: 200 }}
+							out:fade={{ duration: 150 }}
+						>
+							<WatchlistCard
+								{item}
+								priority={index < EAGER_POSTERS}
+								onSelect={() => (selected = item)}
+								onToggle={withToast(item.watched ? 'Moved back to your list' : 'Marked as watched')}
+								onSetSeasons={seasonProgressToast(item)}
+								onRemove={withToast(`Removed “${item.title}”`, 'info')}
+							/>
+						</div>
+					{/each}
+				</PosterGrid>
+			{/if}
 		{/if}
 	{/if}
 </div>
