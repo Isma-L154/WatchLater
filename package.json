@@ -53,5 +53,9 @@
 		"vitest": "^4.1.8",
 		"vitest-browser-svelte": "^2.1.1",
 		"wrangler": "^4.122.0"
+	},
+	"overrides": {
+		"cookie": "^1.0.2",
+		"esbuild": "^0.28.1"
 	}
 }
