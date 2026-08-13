@@ -9,8 +9,5 @@ bun.lockb
 /static/
 /drizzle/
 
-# Local tooling config, not project source
-/.claude/
-
 # Generated Cloudflare Worker types (keep wrangler's canonical format)
 worker-configuration.d.ts
