@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import Icon from '$lib/components/ui/Icon.svelte';
+	import ScrollRail from '$lib/components/ui/ScrollRail.svelte';
 	import SeasonTracker from './SeasonTracker.svelte';
 	import { getSeasonProgress } from '$lib/domain/progress';
 	import { progressNote } from '$lib/domain/episodes';
@@ -36,9 +37,7 @@
 			<span class="text-xs text-ink-faint">({items.length})</span>
 		</div>
 
-		<div
-			class="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6"
-		>
+		<ScrollRail label="Continue watching">
 			{#each items as item (item.id)}
 				{@const progress = getSeasonProgress(item)}
 				{@const note = progressNote(item)}
@@ -91,6 +90,6 @@
 					</div>
 				</article>
 			{/each}
-		</div>
+		</ScrollRail>
 	</section>
 {/if}
