@@ -46,7 +46,7 @@ jobs:
     # attach a required reviewer later if this should stop being automatic.
     environment:
       name: production
-      url: https://watchlater.ilsproj.workers.dev
+      url: https://nextsode.ilsproj.workers.dev
     steps:
       - name: Checkout
         uses: actions/checkout@v5
