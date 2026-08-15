@@ -58,13 +58,24 @@
 </script>
 
 <section aria-labelledby={headingId} class="mb-8">
-	<div class="mb-3 flex items-center gap-2">
-		<Icon name="sparkle" size={16} class="text-brand-hi" />
-		<h2 id={headingId} class="text-sm font-bold tracking-wide text-ink-muted uppercase">
+	<!--
+		The one heading on the page that is a sentence rather than a label.
+
+		Every other section names a category — TRENDING THIS WEEK, SEARCH RESULTS —
+		and small bold capitals are right for those. This one names a *title*, and a
+		title set in capitals stops reading as the name of a thing; mixing the two
+		cases in one line was worse still. So the whole line drops out of the label
+		voice: muted lead-in, the title carried in the display face that the page
+		heading uses, which is what gives it presence at this size without needing
+		to be any louder.
+	-->
+	<div class="mb-3 flex items-baseline gap-2">
+		<Icon name="sparkle" size={15} class="shrink-0 translate-y-0.5 text-brand-hi" />
+		<h2 id={headingId} class="min-w-0 truncate text-[13px] text-ink-muted">
 			{because}
-			<!-- The label is a label and shouts like the others; the title is data,
-			     and data in capitals stops looking like the name of a thing. -->
-			<span class="text-sm text-ink normal-case">{rail.seedTitle}</span>
+			<span class="font-display text-[15px] font-bold tracking-tight text-ink">
+				{rail.seedTitle}
+			</span>
 		</h2>
 	</div>
 
