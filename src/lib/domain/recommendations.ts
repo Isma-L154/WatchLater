@@ -59,8 +59,14 @@ export const MAX_RAILS = 2;
 /** Below this a row looks like a mistake rather than a suggestion. */
 export const MIN_RAIL_ITEMS = 4;
 
-/** A rail is a glance, not a catalogue; the tail of a page is weak anyway. */
-export const MAX_RAIL_ITEMS = 12;
+/**
+ * A rail is a glance, not a catalogue.
+ *
+ * Two rows of twelve was more scrolling than either row earned, and TMDB ranks
+ * its suggestions — so the tail was the weakest half of an already secondary
+ * section.
+ */
+export const MAX_RAIL_ITEMS = 8;
 
 /**
  * Whether a title says anything about taste.

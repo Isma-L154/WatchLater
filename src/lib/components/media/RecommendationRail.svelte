@@ -58,18 +58,49 @@
 </script>
 
 <section aria-labelledby={headingId} class="mb-8">
-	<div class="mb-3 flex items-center gap-2">
-		<Icon name="sparkle" size={16} class="text-brand-hi" />
-		<h2 id={headingId} class="text-sm font-bold tracking-wide text-ink-muted uppercase">
+	<!--
+		The one heading on the page that is a sentence rather than a label.
+
+		Every other section names a category — TRENDING THIS WEEK, SEARCH RESULTS —
+		and small bold capitals are right for those. This one names a *title*, and a
+		title set in capitals stops reading as the name of a thing; mixing the two
+		cases in one line was worse still. So the whole line drops out of the label
+		voice: muted lead-in, the title carried in the display face that the page
+		heading uses, which is what gives it presence at this size without needing
+		to be any louder.
+	-->
+	<div class="mb-3 flex items-baseline gap-2">
+		<Icon name="sparkle" size={15} class="shrink-0 translate-y-0.5 text-brand-hi" />
+		<h2 id={headingId} class="min-w-0 truncate text-[13px] text-ink-muted">
 			{because}
-			<span class="text-ink">{rail.seedTitle}</span>
+			<span class="font-display text-[15px] font-bold tracking-tight text-ink">
+				{rail.seedTitle}
+			</span>
 		</h2>
 	</div>
 
+	<!--
+		The right edge fades instead of slicing.
+
+		A rail is always wider than the screen, so some tile is always cut by the
+		container — and a card severed through the middle of its button reads as a
+		rendering fault rather than as "keep scrolling". The mask turns the same
+		pixels into an affordance. The vertical padding is for the hover lift and
+		the card shadow, which `overflow-x` would otherwise clip.
+
+		`scroll-p*` has to repeat the horizontal padding. Snap points align to the
+		*scrollport*, which is the padding box — so mandatory snapping pulled the
+		first card past the page margin and left it flush against the screen edge,
+		out of line with every other card on the page. It only showed up here
+		because a rail short enough not to scroll never snaps.
+	-->
 	<div
-		class="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6"
+		class="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-pl-4 items-stretch gap-3 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-3rem),transparent)] px-4 pt-2 pb-3 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
 	>
 		{#each rail.items as item, index (mediaKey(item))}
+			<!-- Stays a block: the tile is stretched by the row, and the card fills
+			     it from there. Making this a flex row would leave the card sizing to
+			     its own content width instead of to the tile. -->
 			<div class="w-[9.5rem] flex-shrink-0 snap-start sm:w-[10.5rem]">
 				<DiscoverCard
 					{item}
