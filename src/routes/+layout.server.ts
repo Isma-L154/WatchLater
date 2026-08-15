@@ -28,11 +28,19 @@ function resolveCountry(request: Request): string {
 	return header;
 }
 
-export const load: LayoutServerLoad = async ({ locals, request }) => {
+export const load: LayoutServerLoad = async ({ locals, request, url }) => {
 	return {
 		user: locals.user,
 		authAvailable: isGoogleAuthConfigured(),
 		watchlistCount: locals.user ? await countWatchlist(locals.user.id) : 0,
-		country: resolveCountry(request)
+		country: resolveCountry(request),
+		/**
+		 * Where this deployment lives, for canonical URLs and share cards.
+		 *
+		 * Taken from the request rather than configured, so a move to a custom
+		 * domain rewrites every one of them without a redeploy of settings — and so
+		 * a preview deployment never claims the production URL as its canonical.
+		 */
+		origin: url.origin
 	};
 };

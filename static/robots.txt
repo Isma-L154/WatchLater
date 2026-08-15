@@ -1,7 +1,11 @@
-# The home page is the only thing worth indexing.
+# Everything public is crawlable; the exclusions below are the parts that are
+# not pages at all.
 User-agent: *
-Allow: /$
-# Keep crawlers off the TMDB proxy (it spends a shared, rate-limited API quota)
-# and off the sign-in flow, which only ever produces redirects.
+# The TMDB proxy spends a shared, rate-limited API quota.
 Disallow: /api/
+# Sign-in only ever produces redirects.
 Disallow: /auth/
+# A private list signed in, a sign-in prompt signed out. Neither is a result.
+Disallow: /watchlist
+
+Sitemap: https://watchlater.ilsproj.workers.dev/sitemap.xml

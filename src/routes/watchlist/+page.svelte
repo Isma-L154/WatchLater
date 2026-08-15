@@ -14,6 +14,7 @@
 	import ComingSoon from '$lib/components/media/ComingSoon.svelte';
 	import AutoArchiveControl from '$lib/components/media/AutoArchiveControl.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { applyWatchlistView, countByStatus, isInProgress } from '$lib/domain/watchlist';
 	import type { WatchlistItem } from '$lib/server/db/schema';
@@ -151,10 +152,17 @@
 	}
 </script>
 
-<svelte:head>
-	<title>My List — WatchLater</title>
-	<meta name="description" content="Your personal watch-later list of movies and TV shows." />
-</svelte:head>
+<!--
+	Never indexed. Signed in it is private by definition, and signed out it is a
+	sign-in prompt — ranking a locked door helps nobody who finds it.
+-->
+<Seo
+	title="My List — WatchLater"
+	description="Your personal watch-later list of films and TV shows."
+	origin={page.data.origin}
+	path="/watchlist"
+	indexable={false}
+/>
 
 <div class="py-5 sm:py-8">
 	<div class="mb-5 flex items-baseline justify-between gap-3">
