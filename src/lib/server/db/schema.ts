@@ -56,7 +56,7 @@ export const session = sqliteTable(
 );
 
 /**
- * A single movie or TV show saved to a user's "Watch Later" list.
+ * A single movie or TV show on a user's list.
  *
  * TMDB is the source of truth for media metadata, but we persist a lightweight,
  * display-ready snapshot here so the list renders instantly without an extra

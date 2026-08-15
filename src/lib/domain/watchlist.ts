@@ -4,7 +4,7 @@ import { hasUpcoming, upcomingSortKey } from './upcoming';
 import type { MediaType } from '../types';
 
 /**
- * Pure, framework-agnostic filtering and sorting for the watch-later list.
+ * Pure, framework-agnostic filtering and sorting for the saved list.
  * Extracted from the UI so it can be unit-tested in isolation.
  */
 

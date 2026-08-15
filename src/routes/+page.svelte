@@ -109,14 +109,14 @@
 	be understood as a free application instead of an untyped page of links.
 -->
 <Seo
-	title="WatchLater — track the films and series you mean to watch"
+	title="Nextsode — never lose your place in a series"
 	description="A free watchlist for films and TV. Track series down to the episode you are on, see where to watch anything, and never mark a season watched before it has aired."
 	origin={page.data.origin}
 	path="/"
 	schema={{
 		'@context': 'https://schema.org',
 		'@type': 'WebApplication',
-		name: 'WatchLater',
+		name: 'Nextsode',
 		url: page.data.origin,
 		applicationCategory: 'EntertainmentApplication',
 		operatingSystem: 'Any',

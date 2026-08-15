@@ -1,9 +1,9 @@
-# 🎬 WatchLater
+# 🎬 Nextsode
 
-Search movies and TV shows, save them to a personal watch-later list, and keep
+Search movies and TV shows, save them to a personal list, and keep
 track of where you are in a series. Mobile-first, and free to host.
 
-**▶️ Live demo: [watchlater.ilsproj.workers.dev](https://watchlater.ilsproj.workers.dev)**
+**▶️ Live demo: [nextsode.ilsproj.workers.dev](https://nextsode.ilsproj.workers.dev)**
 
 ---
 
@@ -81,7 +81,7 @@ Tokens → template _Edit Cloudflare Workers_).
 First-time setup:
 
 ```bash
-turso db create watchlater   # put the URL + token in .env, then:
+turso db create nextsode   # put the URL + token in .env, then:
 npm run db:migrate           # apply the schema to the remote database
 
 # Production secrets are not read from .env:

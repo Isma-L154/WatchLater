@@ -405,7 +405,7 @@
 								type="submit"
 								class="flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand py-3 text-sm font-semibold text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-hi"
 							>
-								<Icon name="plus" size={16} stroke={2.5} /> Add to Watch Later
+								<Icon name="plus" size={16} stroke={2.5} /> Save to my list
 							</button>
 						</form>
 					{/if}

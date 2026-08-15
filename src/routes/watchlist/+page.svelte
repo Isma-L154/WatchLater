@@ -157,8 +157,8 @@
 	sign-in prompt — ranking a locked door helps nobody who finds it.
 -->
 <Seo
-	title="My List — WatchLater"
-	description="Your personal watch-later list of films and TV shows."
+	title="My List — Nextsode"
+	description="Your personal list of films and TV shows to watch."
 	origin={page.data.origin}
 	path="/watchlist"
 	indexable={false}
