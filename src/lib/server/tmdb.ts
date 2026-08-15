@@ -37,8 +37,24 @@ interface TmdbPaginatedResponse {
 	total_pages?: number;
 }
 
-/** Perform an authenticated GET against the TMDB API and parse the JSON body. */
-async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): Promise<T> {
+/**
+ * Perform an authenticated GET against the TMDB API and parse the JSON body.
+ *
+ * `cacheSeconds` hands the response to Cloudflare's edge cache. It is keyed by
+ * URL and holds nothing user-specific — every visitor asking about the same
+ * title gets the same answer — so the saving is shared rather than per-session.
+ * `cacheEverything` is required because the request carries an `Authorization`
+ * header, which the edge otherwise treats as a reason never to cache; the header
+ * is our own server token, not the visitor's, so it identifies nobody.
+ *
+ * The option is Cloudflare-only and simply ignored elsewhere, which is what
+ * keeps local development and the tests on live data.
+ */
+async function tmdbFetch<T>(
+	path: string,
+	params: Record<string, string> = {},
+	cacheSeconds = 0
+): Promise<T> {
 	const token = env.TMDB_ACCESS_TOKEN;
 	if (!token) throw new Error('TMDB_ACCESS_TOKEN is not set');
 
@@ -49,7 +65,8 @@ async function tmdbFetch<T>(path: string, params: Record<string, string> = {}): 
 		headers: {
 			Authorization: `Bearer ${token}`,
 			accept: 'application/json'
-		}
+		},
+		...(cacheSeconds > 0 && { cf: { cacheTtl: cacheSeconds, cacheEverything: true } })
 	});
 
 	if (!response.ok) {
@@ -366,11 +383,22 @@ export async function getDetails(
  * more than a rail shows, and which titles are worth asking about is a decision
  * that belongs to `domain/recommendations`, not here.
  */
+/**
+ * A day at the edge.
+ *
+ * What a title is close to does not move hour to hour, and the rows are rebuilt
+ * on every visit to Discover — so without this, opening the page twice costs two
+ * identical sets of lookups. The rows still turn over daily; that comes from
+ * which titles get asked about, not from asking the same one again.
+ */
+const RECOMMENDATION_CACHE_SECONDS = 86_400;
+
 export async function getRecommendations(mediaType: MediaType, id: number): Promise<MediaResult[]> {
-	const data = await tmdbFetch<TmdbPaginatedResponse>(`/${mediaType}/${id}/recommendations`, {
-		language: 'en-US',
-		page: '1'
-	});
+	const data = await tmdbFetch<TmdbPaginatedResponse>(
+		`/${mediaType}/${id}/recommendations`,
+		{ language: 'en-US', page: '1' },
+		RECOMMENDATION_CACHE_SECONDS
+	);
 
 	// Recommendations for a film are overwhelmingly films, but TMDB does mix in
 	// the odd show, so the per-result type wins and the seed's is only a fallback.

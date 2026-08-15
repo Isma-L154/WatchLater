@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRails, pickSeeds, seedState, type SeedCandidate } from './recommendations';
+import { buildRails, dayNumber, pickSeeds, seedState, type SeedCandidate } from './recommendations';
 import { mediaKey } from './media';
 import type { MediaResult } from '../types';
 
@@ -182,5 +182,95 @@ describe('seedState', () => {
 		expect(seedState(seed({ tmdbId: 2, title: 'Mid', episodesIntoSeason: 3 }))).toBe('watching');
 		expect(seedState(seed({ tmdbId: 3, title: 'Mid', seasonsSeen: 1 }))).toBe('watching');
 		expect(seedState(seed({ tmdbId: 4, title: 'Untouched' }))).toBe('saved');
+	});
+});
+
+describe('dayNumber', () => {
+	// 23:30 in Bogota on the 14th is already the 15th in UTC. The viewer's
+	// midnight is the one the rows turn over on, so this is still day 14.
+	it('uses the viewer’s calendar date, not the server’s', () => {
+		const instant = new Date('2026-08-15T04:30:00Z');
+		expect(dayNumber(instant, 'America/Bogota')).toBe(
+			dayNumber(new Date('2026-08-14T18:00:00Z'), 'America/Bogota')
+		);
+		expect(dayNumber(instant, 'UTC')).toBe(dayNumber(instant, 'America/Bogota') + 1);
+	});
+
+	it('advances by exactly one across local midnight', () => {
+		const before = dayNumber(new Date('2026-08-15T04:59:00Z'), 'America/Bogota');
+		const after = dayNumber(new Date('2026-08-15T05:01:00Z'), 'America/Bogota');
+		expect(after).toBe(before + 1);
+	});
+
+	it('falls back to UTC for an unusable zone rather than throwing', () => {
+		const instant = new Date('2026-08-15T12:00:00Z');
+		expect(dayNumber(instant, 'Not/AZone')).toBe(dayNumber(instant, 'UTC'));
+	});
+});
+
+describe('pickSeeds — daily rotation', () => {
+	const engaged = (n: number) =>
+		Array.from({ length: n }, (_, i) =>
+			seed({
+				tmdbId: i + 1,
+				title: `Show ${i + 1}`,
+				watched: true,
+				watchedAt: new Date(2026, 0, 30 - i)
+			})
+		);
+
+	it('shows a different set of seeds the next day', () => {
+		const rows = engaged(6);
+		const today = pickSeeds(rows, 3, 0).map((s) => s.title);
+		const tomorrow = pickSeeds(rows, 3, 1).map((s) => s.title);
+
+		expect(today).not.toEqual(tomorrow);
+		expect(today).toEqual(['Show 1', 'Show 2', 'Show 3']);
+		expect(tomorrow).toEqual(['Show 2', 'Show 3', 'Show 4']);
+	});
+
+	it('is stable within the same day', () => {
+		const rows = engaged(6);
+		expect(pickSeeds(rows, 3, 100)).toEqual(pickSeeds(rows, 3, 100));
+	});
+
+	it('cycles back round rather than running out', () => {
+		const rows = engaged(6);
+		expect(pickSeeds(rows, 3, 6).map((s) => s.title)).toEqual(
+			pickSeeds(rows, 3, 0).map((s) => s.title)
+		);
+	});
+
+	/**
+	 * The limitation worth stating: with no more engaged titles than rails, every
+	 * day draws on the same shows and only their order moves.
+	 */
+	it('only reorders when there is nothing else to rotate to', () => {
+		const rows = engaged(2);
+		const today = pickSeeds(rows, 3, 100).map((s) => s.title);
+		const tomorrow = pickSeeds(rows, 3, 101).map((s) => s.title);
+
+		expect(new Set(today)).toEqual(new Set(tomorrow));
+		expect(today).not.toEqual(tomorrow);
+	});
+
+	// Rotation must never walk off the engaged pool into untouched saves.
+	it('never rotates an untouched title ahead of an engaged one', () => {
+		const rows = [
+			...engaged(4),
+			seed({ tmdbId: 90, title: 'Never watched', addedAt: new Date('2026-08-14') })
+		];
+
+		for (let day = 0; day < 12; day++) {
+			expect(pickSeeds(rows, 3, day).map((s) => s.title)).not.toContain('Never watched');
+		}
+	});
+
+	it('still falls back to untouched saves when nothing is engaged', () => {
+		const rows = [
+			seed({ tmdbId: 1, title: 'Saved A', addedAt: new Date('2026-08-01') }),
+			seed({ tmdbId: 2, title: 'Saved B', addedAt: new Date('2026-08-02') })
+		];
+		expect(pickSeeds(rows, 3, 7).map((s) => s.title)).toEqual(['Saved B', 'Saved A']);
 	});
 });
