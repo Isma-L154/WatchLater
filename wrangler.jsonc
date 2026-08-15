@@ -6,7 +6,20 @@
 	"main": ".svelte-kit/cloudflare/_worker.js",
 	"assets": {
 		"binding": "ASSETS",
-		"directory": ".svelte-kit/cloudflare"
+		"directory": ".svelte-kit/cloudflare",
+		/**
+		 * Serve `.html` assets at the path they are named, with no rewriting.
+		 *
+		 * The default (`auto-trailing-slash`) treats `.html` as an implementation
+		 * detail of a pretty URL and 307s `/file.html` to `/file`. That is a
+		 * reasonable default for a static site and wrong here: the one HTML asset
+		 * is Search Console's ownership token, which is checked at its literal
+		 * path — a redirect fails the check even though the content is right there.
+		 *
+		 * Nothing else is affected. Every page is server-rendered, so the Worker
+		 * owns all routing and this is the only `.html` in the build.
+		 */
+		"html_handling": "none"
 	},
 	"workers_dev": true,
 	"preview_urls": true
