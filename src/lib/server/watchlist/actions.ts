@@ -1,0 +1,383 @@
+import { fail, type Actions } from '@sveltejs/kit';
+import { and, eq, sql } from 'drizzle-orm';
+import { getDb } from '../db';
+import { user, watchlistItem } from '../db/schema';
+import { clip, toPositiveInt, toRating } from '../form';
+import {
+	clampSeasons,
+	deriveWatched,
+	normalizeAiredSeasons,
+	normalizeTotalSeasons
+} from '$lib/domain/progress';
+import { resolveEpisodeTarget, seasonBoundary } from '$lib/domain/episodes';
+import { normalizeArchiveWindow } from '$lib/domain/archive';
+import { resolveSeasonInfo, safeDetails, seasonInfoForSave } from './seasons';
+import { watchedStamp } from './stamp';
+import type { MediaType } from '$lib/types';
+
+/**
+ * Every write a visitor can make to their own list.
+ *
+ * Both routes need these: Discover saves titles and My List edits them, and a
+ * SvelteKit form action only exists on the route it is declared in. Rather than
+ * two drifting copies, each `+page.server.ts` re-exports this one set.
+ *
+ * Two rules hold across all of them. Nothing is trusted from the browser except
+ * intent — every bound is resolved here — and every statement is scoped by the
+ * session's user id, because item ids travel through the browser as form fields
+ * and knowing one must not be enough to use it.
+ */
+
+/** Returned by every action when the caller has no session. */
+const UNAUTHENTICATED = { message: 'Please sign in first.' };
+
+/**
+ * Ceiling on how many titles one account may store.
+ *
+ * Far above any realistic list, but it stops a signed-in account from growing
+ * the shared database without bound — the free Turso tier is a finite resource
+ * shared by every user of the deployment.
+ */
+const MAX_ITEMS_PER_USER = 5000;
+
+/**
+ * Match a row by id *and* owner.
+ *
+ * The id alone would be enough to find the row, which is exactly the problem.
+ * Someone else's id simply matches nothing.
+ */
+function ownedRow(id: string, userId: string) {
+	return and(eq(watchlistItem.id, id), eq(watchlistItem.userId, userId));
+}
+
+export const watchlistActions = {
+	/** Save a movie/TV show. Duplicates are silently ignored via the unique index. */
+	add: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const tmdbId = toPositiveInt(form.get('tmdbId'));
+		const mediaType = String(form.get('mediaType') ?? '') as MediaType;
+		const title = clip(form.get('title'), 300);
+
+		if (!tmdbId || (mediaType !== 'movie' && mediaType !== 'tv') || !title) {
+			return fail(400, { message: 'Invalid item data.' });
+		}
+
+		const db = getDb();
+
+		/**
+		 * One query answers both guards: how full the list is, and whether this
+		 * title is already on it. Checking for the duplicate up front also avoids
+		 * spending a TMDB request on a save that would be discarded anyway.
+		 */
+		const [stats] = await db
+			.select({
+				total: sql<number>`count(*)`,
+				duplicates: sql<number>`sum(case when ${watchlistItem.tmdbId} = ${tmdbId} and ${watchlistItem.mediaType} = ${mediaType} then 1 else 0 end)`
+			})
+			.from(watchlistItem)
+			.where(eq(watchlistItem.userId, locals.user.id));
+
+		if (Number(stats?.duplicates ?? 0) > 0) return { added: false };
+		if (Number(stats?.total ?? 0) >= MAX_ITEMS_PER_USER) {
+			return fail(400, { message: 'Your watchlist is full.' });
+		}
+
+		await db
+			.insert(watchlistItem)
+			.values({
+				userId: locals.user.id,
+				tmdbId,
+				mediaType,
+				title,
+				posterPath: clip(form.get('posterPath'), 200),
+				releaseDate: clip(form.get('releaseDate'), 10),
+				overview: clip(form.get('overview'), 2000),
+				voteAverage: toRating(form.get('voteAverage')),
+				...(await seasonInfoForSave(mediaType, tmdbId))
+			})
+			// Backstop for two concurrent saves of the same title: the unique index
+			// is the real guarantee, the check above is just the cheap fast path.
+			.onConflictDoNothing();
+
+		return { added: true };
+	},
+
+	/** Remove an item from the list. */
+	remove: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		await getDb().delete(watchlistItem).where(ownedRow(id, locals.user.id));
+		return { removed: true };
+	},
+
+	/**
+	 * Toggle the watched/unwatched state of an item.
+	 *
+	 * For a season-tracked show this also moves the counter to the matching end,
+	 * so progress and status can never contradict each other. Stepping back from
+	 * "complete" lands on the previous season rather than zero: the user has still
+	 * seen those seasons, and discarding that would be data loss.
+	 */
+	toggleWatched: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		const db = getDb();
+		const [item] = await db
+			.select({
+				watched: watchlistItem.watched,
+				watchedAt: watchlistItem.watchedAt,
+				totalSeasons: watchlistItem.totalSeasons,
+				airedSeasons: watchlistItem.airedSeasons
+			})
+			.from(watchlistItem)
+			.where(ownedRow(id, locals.user.id))
+			.limit(1);
+		if (!item) return fail(404, { message: 'Item not found.' });
+
+		const watched = !item.watched;
+		// Only aired seasons can be ticked off, so "mark watched" lands on the last
+		// broadcast season rather than on an announced one.
+		const ceiling = item.airedSeasons ?? item.totalSeasons;
+
+		/**
+		 * The toggle speaks in whole seasons, so the position lands on a season
+		 * boundary — bookmark included. Without season data there is no counter to
+		 * move and `seasonsSeen` is left exactly as it was: writing a zero there
+		 * would erase progress on a show whose lookup simply has not resolved yet.
+		 */
+		const position = ceiling
+			? seasonBoundary(watched ? ceiling : ceiling - 1)
+			: { episodesIntoSeason: 0 };
+
+		await db
+			.update(watchlistItem)
+			.set({
+				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt),
+				...position
+			})
+			.where(ownedRow(id, locals.user.id));
+
+		return { toggled: true, watched };
+	},
+
+	/**
+	 * Choose how long a watched title stays before it is archived, or turn the
+	 * whole thing off.
+	 *
+	 * Anything that is not one of the offered windows is stored as null — "off" —
+	 * rather than rejected, because the failure mode of a bad value here is
+	 * someone's list being tidied on a schedule they never picked.
+	 */
+	setAutoArchive: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const days = normalizeArchiveWindow(form.get('days'));
+
+		await getDb().update(user).set({ autoArchiveDays: days }).where(eq(user.id, locals.user.id));
+		return { autoArchiveDays: days };
+	},
+
+	/** Bring an archived title back onto the list. */
+	restore: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		/**
+		 * The watched clock restarts on restore. Otherwise a title pulled back would
+		 * still be weeks overdue and get archived again on the very next page load —
+		 * which reads as the restore having silently failed.
+		 */
+		await getDb()
+			.update(watchlistItem)
+			.set({ archivedAt: null, watchedAt: new Date() })
+			.where(ownedRow(id, locals.user.id));
+
+		return { restored: true };
+	},
+
+	/** Reset the archive countdown for a title without changing anything else. */
+	keepLonger: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		await getDb()
+			.update(watchlistItem)
+			.set({ watchedAt: new Date() })
+			.where(ownedRow(id, locals.user.id));
+
+		return { kept: true };
+	},
+
+	/**
+	 * Move the bookmark to "watched through season S, episode E".
+	 *
+	 * Absolute like `setSeasons`, so a double tap or a replayed request is
+	 * idempotent. The season is always re-read from TMDB: episode counts and air
+	 * dates are exactly the bounds the request is validated against, and a client
+	 * does not get to define its own ceiling.
+	 */
+	setEpisode: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		const season = Number(form.get('season'));
+		const episode = Number(form.get('episode'));
+
+		if (!id) return fail(400, { message: 'Missing id.' });
+		if (!Number.isInteger(season) || season < 1) return fail(400, { message: 'Invalid season.' });
+
+		const db = getDb();
+		const [item] = await db
+			.select({
+				tmdbId: watchlistItem.tmdbId,
+				mediaType: watchlistItem.mediaType,
+				watchedAt: watchlistItem.watchedAt,
+				airedSeasons: watchlistItem.airedSeasons,
+				totalSeasons: watchlistItem.totalSeasons
+			})
+			.from(watchlistItem)
+			.where(ownedRow(id, locals.user.id))
+			.limit(1);
+
+		if (!item) return fail(404, { message: 'Item not found.' });
+		if (item.mediaType !== 'tv') return fail(400, { message: 'Only TV shows track episodes.' });
+
+		const details = await safeDetails(item.tmdbId, season);
+		if (!details) return fail(502, { message: 'Could not reach TMDB. Please try again.' });
+
+		const airedSeasons = normalizeAiredSeasons(details.airedSeasons) ?? item.airedSeasons;
+		if (!airedSeasons || season > airedSeasons) {
+			return fail(400, { message: 'That season has not aired yet.' });
+		}
+
+		const target = resolveEpisodeTarget(
+			season,
+			episode,
+			details.episodeCounts[season] ?? null,
+			details.season?.airedCount ?? null
+		);
+
+		const watched =
+			deriveWatched(target.seasonsSeen, airedSeasons) && target.episodesIntoSeason === 0;
+
+		await db
+			.update(watchlistItem)
+			.set({
+				...target,
+				airedSeasons,
+				totalSeasons: normalizeTotalSeasons(details.seasons) ?? item.totalSeasons,
+				nextSeasonNumber: details.upcomingSeason?.number ?? null,
+				nextSeasonAirDate: details.upcomingSeason?.airDate ?? null,
+				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt)
+			})
+			.where(ownedRow(id, locals.user.id));
+
+		return {
+			...target,
+			airedSeasons,
+			season,
+			episodesWatched: target.episodesIntoSeason,
+			seasonComplete: target.seasonsSeen >= season
+		};
+	},
+
+	/**
+	 * Set how many seasons of a show have been watched.
+	 *
+	 * The target is absolute rather than a delta, so a double submit or a replayed
+	 * request is idempotent. The season *count* is always resolved server-side —
+	 * the client sends only "how far I got", never the bounds it is measured
+	 * against.
+	 */
+	setSeasons: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		const requested = Number(form.get('seasons'));
+		if (!id) return fail(400, { message: 'Missing id.' });
+
+		const db = getDb();
+		const [item] = await db
+			.select({
+				tmdbId: watchlistItem.tmdbId,
+				mediaType: watchlistItem.mediaType,
+				watchedAt: watchlistItem.watchedAt,
+				totalSeasons: watchlistItem.totalSeasons,
+				airedSeasons: watchlistItem.airedSeasons
+			})
+			.from(watchlistItem)
+			.where(ownedRow(id, locals.user.id))
+			.limit(1);
+
+		if (!item) return fail(404, { message: 'Item not found.' });
+		if (item.mediaType !== 'tv') return fail(400, { message: 'Only TV shows track seasons.' });
+
+		/**
+		 * Re-read from TMDB in exactly two situations: when nothing is stored (an
+		 * entry that predates air-date tracking), and when this change would use up
+		 * every aired season — the one moment where being stale is visible, because
+		 * a season may have premiered since we last looked.
+		 *
+		 * Every other tap is a pure database write with no external call.
+		 */
+		const stored = item.airedSeasons;
+		const shouldRefresh = stored === null || requested >= stored;
+		const fresh = shouldRefresh ? await resolveSeasonInfo(item.tmdbId) : null;
+
+		const airedSeasons = fresh?.airedSeasons ?? stored;
+		if (!airedSeasons) return fail(400, { message: 'No season data available for this title.' });
+
+		/**
+		 * The clamp is the guard that matters: it is measured against *aired*
+		 * seasons, so a request to tick off an announced season silently lands on the
+		 * last one that actually exists instead of being honoured.
+		 */
+		const seasonsSeen = clampSeasons(requested, airedSeasons);
+		const watched = deriveWatched(seasonsSeen, airedSeasons);
+
+		// Only a fresh lookup may touch the descriptive columns — writing them from
+		// a skipped one would blank the row with nulls it never learned.
+		await db
+			.update(watchlistItem)
+			.set({
+				// Named a season, so the position is that season's boundary.
+				...seasonBoundary(seasonsSeen),
+				airedSeasons,
+				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt),
+				...(fresh && {
+					totalSeasons: fresh.totalSeasons,
+					nextSeasonNumber: fresh.nextSeasonNumber,
+					nextSeasonAirDate: fresh.nextSeasonAirDate
+				})
+			})
+			.where(ownedRow(id, locals.user.id));
+
+		return {
+			seasonsSeen,
+			airedSeasons,
+			totalSeasons: fresh?.totalSeasons ?? item.totalSeasons
+		};
+	}
+} satisfies Actions;

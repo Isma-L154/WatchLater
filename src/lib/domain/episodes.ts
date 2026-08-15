@@ -155,6 +155,37 @@ export function resolveEpisodeTarget(
 }
 
 /**
+ * The stored position for "watched through the end of season N".
+ *
+ * Every control that speaks in whole seasons lands here: the season picker, the
+ * watched toggle, and the refresh that re-derives progress when a new season
+ * airs. Each of those used to write a bare `0` for the bookmark from memory, and
+ * two of the three were missed when episode tracking arrived — the same bug
+ * twice, because the rule lived in people's heads rather than in a function.
+ */
+export function seasonBoundary(seasonsSeen: number): EpisodeTarget {
+	return { seasonsSeen: Math.max(0, seasonsSeen), episodesIntoSeason: 0 };
+}
+
+/**
+ * Keep a bookmark across a re-derivation, but only while it still means
+ * something.
+ *
+ * The season counter moving is what invalidates it: a downward clamp means TMDB
+ * corrected the season list, so "six episodes into the next one" now points at a
+ * season that no longer exists.
+ */
+export function carryBookmark(
+	previousSeasonsSeen: number,
+	nextSeasonsSeen: number,
+	episodesIntoSeason: number
+): EpisodeTarget {
+	return nextSeasonsSeen === previousSeasonsSeen
+		? { seasonsSeen: nextSeasonsSeen, episodesIntoSeason }
+		: seasonBoundary(nextSeasonsSeen);
+}
+
+/**
  * Step back one episode, crossing into the previous season when at its start.
  *
  * The previous season's length is needed to land on its final episode; without

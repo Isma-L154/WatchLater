@@ -1,7 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import { uniqueBy } from '$lib/domain/media';
-	import { providerLogoUrl } from '$lib/tmdb-image';
+	import { providerLogoUrl } from '$lib/format/tmdb-image';
 	import type { WatchOptions, WatchProvider } from '$lib/types';
 
 	/**

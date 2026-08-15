@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+	carryBookmark,
 	getEpisodePosition,
 	hasStarted,
 	previousEpisode,
 	progressNote,
 	resolveEpisodeTarget,
+	seasonBoundary,
 	type EpisodeEntry,
 	type ProgressEntry
 } from './episodes';
@@ -172,5 +174,26 @@ describe('progressNote', () => {
 				noted({ seasonsSeen: 0, episodesIntoSeason: 2, airedSeasons: 1, totalSeasons: 1 })
 			)
 		).toBe('Next: S1E3');
+	});
+});
+
+describe('seasonBoundary', () => {
+	it('is a whole season with no bookmark left over', () => {
+		expect(seasonBoundary(3)).toEqual({ seasonsSeen: 3, episodesIntoSeason: 0 });
+	});
+
+	it('floors at zero', () => {
+		expect(seasonBoundary(-2)).toEqual({ seasonsSeen: 0, episodesIntoSeason: 0 });
+	});
+});
+
+describe('carryBookmark', () => {
+	it('keeps the bookmark while the season counter holds', () => {
+		expect(carryBookmark(2, 2, 6)).toEqual({ seasonsSeen: 2, episodesIntoSeason: 6 });
+	});
+
+	// A corrected season list leaves the bookmark pointing at nothing.
+	it('drops it when the season counter moves', () => {
+		expect(carryBookmark(3, 1, 6)).toEqual({ seasonsSeen: 1, episodesIntoSeason: 0 });
 	});
 });

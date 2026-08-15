@@ -9,7 +9,13 @@
 	import EpisodePicker from './EpisodePicker.svelte';
 	import WatchProviders from './WatchProviders.svelte';
 	import { getEpisodePosition } from '$lib/domain/episodes';
-	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
+	import {
+		backdropUrl,
+		formatRuntime,
+		posterUrl,
+		profileUrl,
+		releaseYear
+	} from '$lib/format/tmdb-image';
 	import { getReleaseInfo, releaseVerb } from '$lib/domain/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import type { MediaDetails, MediaType, SavedEntry } from '$lib/types';
