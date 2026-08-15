@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import Icon, { type IconName } from './Icon.svelte';
 	import AccountChip from '$lib/components/auth/AccountChip.svelte';
+	import Footer from './Footer.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import type { SessionUser } from '$lib/types';
 
@@ -122,9 +123,13 @@
 		Bottom padding on mobile clears the fixed tab bar; without it the last row
 		of posters sits permanently underneath it and can never be scrolled clear.
 	-->
-	<main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 sm:px-6 sm:pb-20">
+	<main id="main" class="mx-auto w-full max-w-6xl flex-1 px-4 sm:px-6">
 		{@render children()}
 	</main>
+
+	<!-- Bottom padding lives here rather than on `main`, so the required TMDB
+	     credit sits above the phone tab bar instead of behind it. -->
+	<div class="pb-28 sm:pb-20"><Footer /></div>
 
 	<!-- Mobile navigation: fixed to the bottom, inside the thumb arc. -->
 	<nav
