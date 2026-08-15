@@ -21,6 +21,29 @@
 		 */
 		"html_handling": "none"
 	},
+	/**
+	 * Per-visitor ceiling on the public TMDB proxies.
+	 *
+	 * `/api/search` and `/api/trending` answer without a session, by design —
+	 * browsing works signed out. That makes them the one surface where a script
+	 * can spend a shared, rate-limited TMDB quota on everybody else's behalf, and
+	 * the reason a CAPTCHA on the sign-in button would have protected nothing.
+	 *
+	 * The dashboard's rate limiting rules are not an option here: those apply to
+	 * zones, and this runs on a workers.dev subdomain. This binding runs inside
+	 * the Worker instead, and adds no cost beyond the request itself.
+	 *
+	 * Cloudflare describes it as approximate rather than exact, which is the right
+	 * trade for the job: the goal is to stop a script draining the quota, not to
+	 * bill anyone for the 61st search.
+	 */
+	"ratelimits": [
+		{
+			"name": "API_RATE_LIMIT",
+			"namespace_id": "1001",
+			"simple": { "limit": 60, "period": 60 }
+		}
+	],
 	"workers_dev": true,
 	"preview_urls": true
 }

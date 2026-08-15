@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { getDetails } from '$lib/server/tmdb';
+import { enforceRateLimit } from '$lib/server/rate-limit';
 import type { RequestHandler } from './$types';
 
 /**
@@ -15,7 +16,10 @@ const CACHE_CONTROL = 'public, max-age=600, s-maxage=21600, stale-while-revalida
  * Server-side proxy for a single title's full details (genres, cast, trailer).
  * Keeps the TMDB access token on the server.
  */
-export const GET: RequestHandler = async ({ params, url }) => {
+export const GET: RequestHandler = async (event) => {
+	await enforceRateLimit(event);
+	const { params, url } = event;
+
 	const { type, id } = params;
 	const tmdbId = Number(id);
 

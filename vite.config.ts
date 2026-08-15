@@ -14,6 +14,43 @@ export default defineConfig({
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
 			adapter: adapter(),
+
+			/**
+			 * Content Security Policy.
+			 *
+			 * The app already sent one, but it carried a single directive
+			 * (`frame-ancestors`) — enough to stop clickjacking and nothing else. A
+			 * policy without `script-src` does not constrain script injection at all,
+			 * which is the attack CSP exists for.
+			 *
+			 * SvelteKit generates the hashes for its own inline hydration script, so
+			 * `unsafe-inline` is never needed for scripts. Everything below is an
+			 * origin the app genuinely loads from, and nothing else can run.
+			 */
+			csp: {
+				mode: 'hash',
+				directives: {
+					'default-src': ['self'],
+					'script-src': ['self'],
+					// Styles stay permissive: Tailwind and Svelte both emit inline
+					// style attributes during SSR, and an injected style cannot
+					// execute — a far smaller risk than the same allowance on script.
+					'style-src': ['self', 'unsafe-inline'],
+					// Posters from TMDB, avatars from Google, inline SVG data URIs.
+					'img-src': ['self', 'data:', 'https://image.tmdb.org', 'https://*.googleusercontent.com'],
+					'font-src': ['self'],
+					'connect-src': ['self'],
+					// The trailer embed, and nothing else may frame anything.
+					'frame-src': ['https://www.youtube-nocookie.com'],
+					'frame-ancestors': ['none'],
+					'object-src': ['none'],
+					'base-uri': ['none'],
+					// Sign-out and every list mutation post to this origin; sign-in
+					// leaves by redirect, which this does not govern.
+					'form-action': ['self']
+				}
+			},
+
 			typescript: {
 				config: (config) => {
 					config.include.push('../drizzle.config.ts');

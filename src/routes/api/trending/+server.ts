@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { getTrending } from '$lib/server/tmdb';
+import { enforceRateLimit } from '$lib/server/rate-limit';
 import type { RequestHandler } from './$types';
 
 /**
@@ -21,7 +22,10 @@ const CACHE_CONTROL = 'public, max-age=900, s-maxage=3600, stale-while-revalidat
  * server-rendered with the document; this backs the "Load more" control, so the
  * initial paint never pays for titles below the fold.
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async (event) => {
+	await enforceRateLimit(event);
+	const { url } = event;
+
 	const raw = url.searchParams.get('page') ?? '1';
 	const page = Number(raw);
 
