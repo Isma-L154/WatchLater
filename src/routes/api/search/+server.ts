@@ -1,5 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { searchMulti } from '$lib/server/tmdb';
+import { enforceRateLimit } from '$lib/server/rate-limit';
 import type { RequestHandler } from './$types';
 
 /**
@@ -28,7 +29,10 @@ const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidat
  * Server-side proxy to TMDB multi-search. The browser calls this endpoint
  * instead of TMDB directly, which keeps the access token off the client.
  */
-export const GET: RequestHandler = async ({ url }) => {
+export const GET: RequestHandler = async (event) => {
+	await enforceRateLimit(event);
+	const { url } = event;
+
 	const query = (url.searchParams.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH);
 	if (!query) return json({ results: [] });
 

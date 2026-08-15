@@ -73,6 +73,12 @@ test('serves baseline security headers', async ({ page }) => {
 	expect(headers['x-frame-options']).toBe('DENY');
 	expect(headers['x-content-type-options']).toBe('nosniff');
 	expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
+	// A policy without script-src constrains nothing an injection would do.
+	expect(headers['content-security-policy']).toContain("script-src 'self'");
+	expect(headers['content-security-policy']).not.toContain("script-src 'self' 'unsafe-inline'");
+	expect(headers['strict-transport-security']).toContain('max-age=');
+	// Never on a shared public suffix: those hostnames are other people's.
+	expect(headers['strict-transport-security']).not.toContain('includeSubDomains');
 	// Personalised HTML must never be cacheable by a shared proxy.
 	expect(headers['cache-control']).toContain('no-store');
 });

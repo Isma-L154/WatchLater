@@ -48,11 +48,34 @@ const authenticate: Handle = async ({ event, resolve }) => {
 const securityHeaders: Handle = async ({ event, resolve }) => {
 	const response = await resolve(event);
 
-	response.headers.set('content-security-policy', "frame-ancestors 'none'");
+	// The full policy is generated per response by SvelteKit, which knows the
+	// hashes of its own inline scripts — see `csp` in vite.config.ts. This one
+	// remains for the responses that never pass through it, such as the API
+	// proxies, where a bare frame-ancestors is still worth having.
+	if (!response.headers.has('content-security-policy')) {
+		response.headers.set('content-security-policy', "frame-ancestors 'none'");
+	}
 	response.headers.set('x-frame-options', 'DENY');
 	response.headers.set('x-content-type-options', 'nosniff');
 	response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
 	response.headers.set('permissions-policy', 'camera=(), microphone=(), geolocation=()');
+
+	/**
+	 * Refuse to be spoken to over plain HTTP again.
+	 *
+	 * Deliberately without `includeSubDomains` and without `preload`. This host
+	 * sits under a shared public suffix, so those would reach hostnames belonging
+	 * to other people's projects — a commitment that is not ours to make.
+	 */
+	response.headers.set('strict-transport-security', 'max-age=31536000');
+
+	/**
+	 * Keep other origins from holding a handle on this window or reading its
+	 * resources. The trailer opens in an iframe we control; nothing needs a
+	 * cross-origin reference back to us.
+	 */
+	response.headers.set('cross-origin-opener-policy', 'same-origin');
+	response.headers.set('cross-origin-resource-policy', 'same-origin');
 
 	/**
 	 * Default every response to uncacheable.
