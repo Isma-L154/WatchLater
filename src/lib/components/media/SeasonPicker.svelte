@@ -52,6 +52,9 @@
 	 * whether the viewer is actually caught up.
 	 */
 	const onSubmit: SubmitFunction = () => {
+		// Captured before the await: the sheet may refetch and blank the details
+		// this prop is derived from while the action is in flight.
+		const label = title;
 		return async ({ result, update }) => {
 			await update();
 			if (result.type !== 'success') {
@@ -62,8 +65,8 @@
 			const seen = payload?.seasonsSeen ?? 0;
 			const aired = payload?.airedSeasons ?? 0;
 
-			if (aired && seen >= aired) toasts.add(`Caught up on “${title}” 🎉`);
-			else if (seen === 0) toasts.add(`Reset progress for “${title}”`, 'info');
+			if (aired && seen >= aired) toasts.add(`Caught up on “${label}” 🎉`);
+			else if (seen === 0) toasts.add(`Reset progress for “${label}”`, 'info');
 			else toasts.add(`Season ${seen} watched`);
 		};
 	};

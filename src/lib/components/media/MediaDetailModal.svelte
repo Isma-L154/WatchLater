@@ -6,7 +6,9 @@
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import SeasonPicker from './SeasonPicker.svelte';
+	import EpisodePicker from './EpisodePicker.svelte';
 	import WatchProviders from './WatchProviders.svelte';
+	import { getEpisodePosition } from '$lib/domain/episodes';
 	import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from '$lib/tmdb-image';
 	import { getReleaseInfo, releaseVerb } from '$lib/domain/release';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -32,9 +34,20 @@
 	let showTrailer = $state(false);
 	let dialog = $state<HTMLElement | null>(null);
 
-	// Refetch whenever the selected title changes.
+	/**
+	 * Which season's episodes to request: the one in progress. Derived from the
+	 * saved row rather than from the details response, so the request can be made
+	 * in the same round-trip that fetches the details themselves.
+	 */
+	const position = $derived(
+		saved && mediaType === 'tv'
+			? getEpisodePosition({ mediaType, ...saved, episodesIntoSeason: saved.episodesIntoSeason })
+			: null
+	);
+
+	// Refetch whenever the selected title, or the season being tracked, changes.
 	$effect(() => {
-		void loadDetails(tmdbId, mediaType, country);
+		void loadDetails(tmdbId, mediaType, country, position?.trackable ? position.season : null);
 	});
 
 	/**
@@ -101,13 +114,14 @@
 		return () => window.removeEventListener('keydown', onKey);
 	});
 
-	async function loadDetails(id: number, type: MediaType, region: string) {
+	async function loadDetails(id: number, type: MediaType, region: string, season: number | null) {
 		loading = true;
 		loadError = false;
 		showTrailer = false;
 		details = null;
 		try {
-			const response = await fetch(`/api/details/${type}/${id}?country=${region}`);
+			const query = season ? `?country=${region}&season=${season}` : `?country=${region}`;
+			const response = await fetch(`/api/details/${type}/${id}${query}`);
 			if (!response.ok) throw new Error('Request failed');
 			details = (await response.json()) as MediaDetails;
 		} catch {
@@ -207,7 +221,8 @@
 				<p class="text-ink-muted">Couldn't load details.</p>
 				<button
 					type="button"
-					onclick={() => loadDetails(tmdbId, mediaType, country)}
+					onclick={() =>
+						loadDetails(tmdbId, mediaType, country, position?.trackable ? position.season : null)}
 					class="cursor-pointer rounded-lg bg-surface-hi px-4 py-2 text-sm font-semibold text-ink ring-1 ring-line transition-colors duration-200 hover:bg-line"
 				>
 					Try again
@@ -321,6 +336,17 @@
 						totalSeasons={details.seasons ?? details.airedSeasons}
 						upcomingSeason={details.upcomingSeason}
 						seasonsSeen={saved.watched ? details.airedSeasons : saved.seasonsSeen}
+					/>
+				{/if}
+
+				<!-- Episodes sit right under the season row: the season picker says
+				     which season, this says where inside it. -->
+				{#if saved && position?.trackable && details.season}
+					<EpisodePicker
+						itemId={saved.id}
+						title={details.title}
+						season={details.season}
+						episodesWatched={position.episodesWatched}
 					/>
 				{/if}
 

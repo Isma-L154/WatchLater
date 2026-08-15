@@ -33,8 +33,16 @@ export const GET: RequestHandler = async ({ params, url }) => {
 	 */
 	const country = normalizeCountry(url.searchParams.get('country'));
 
+	/**
+	 * Which season's episodes to bring along, if any. Also part of the cache key,
+	 * so each season caches separately rather than the first one requested
+	 * standing in for the rest.
+	 */
+	const seasonParam = Number(url.searchParams.get('season'));
+	const season = Number.isInteger(seasonParam) && seasonParam >= 1 ? seasonParam : null;
+
 	try {
-		const details = await getDetails(type, tmdbId, country);
+		const details = await getDetails(type, tmdbId, country, season);
 		return json(details, { headers: { 'cache-control': CACHE_CONTROL } });
 	} catch (err) {
 		console.error('TMDB details failed:', err);

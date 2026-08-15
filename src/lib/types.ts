@@ -39,6 +39,7 @@ export interface SavedEntry {
 	id: string;
 	watched: boolean;
 	seasonsSeen: number;
+	episodesIntoSeason: number;
 	totalSeasons: number | null;
 	airedSeasons: number | null;
 }
@@ -90,6 +91,30 @@ export interface UpcomingSeason {
 	airDate: string | null;
 }
 
+/**
+ * One episode of a season.
+ *
+ * `aired` is resolved on the server rather than left to the browser: it is the
+ * ceiling for how far progress can advance, and a client clock is not something
+ * a write should be validated against.
+ */
+export interface Episode {
+	number: number;
+	name: string;
+	/** `YYYY-MM-DD`, or null when TMDB has no date. */
+	airDate: string | null;
+	runtimeMinutes: number | null;
+	aired: boolean;
+}
+
+/** The episode list of a single season, when one was requested. */
+export interface SeasonEpisodes {
+	seasonNumber: number;
+	episodes: Episode[];
+	/** How many have actually aired — the write ceiling. */
+	airedCount: number;
+}
+
 /** Rich details for a single title, backing the detail modal. */
 export interface MediaDetails {
 	tmdbId: number;
@@ -106,6 +131,14 @@ export interface MediaDetails {
 	airedSeasons: number | null;
 	/** TV only: the next season still to premiere, if there is one. */
 	upcomingSeason: UpcomingSeason | null;
+	/**
+	 * TV only: how many episodes each numbered season holds, indexed by season
+	 * number. Comes free with the details response, so the app can roll over from
+	 * the last episode of a season without an extra request.
+	 */
+	episodeCounts: Record<number, number>;
+	/** TV only: the episode list of the season that was requested, if any. */
+	season: SeasonEpisodes | null;
 	/**
 	 * TMDB production status ("Released", "Post Production", "In Production",
 	 * "Planned", "Returning Series"…). Used to explain *why* a title has no

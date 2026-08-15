@@ -10,6 +10,7 @@ import {
 	normalizeTotalSeasons
 } from '$lib/domain/progress';
 import { isDueForArchive, normalizeArchiveWindow, type ArchiveWindow } from '$lib/domain/archive';
+import { resolveEpisodeTarget } from '$lib/domain/episodes';
 import type { MediaType } from '$lib/types';
 import type { Actions } from '@sveltejs/kit';
 
@@ -381,6 +382,83 @@ export const watchlistActions = {
 	},
 
 	/**
+	 * Move the bookmark to "watched through season S, episode E".
+	 *
+	 * Absolute like `setSeasons`, so a double tap or a replayed request is
+	 * idempotent. The season is always re-read from TMDB: episode counts and air
+	 * dates are exactly the bounds the request is validated against, and a client
+	 * does not get to define its own ceiling.
+	 */
+	setEpisode: async ({ request, locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+
+		const form = await request.formData();
+		const id = clip(form.get('id'), 64);
+		const season = Number(form.get('season'));
+		const episode = Number(form.get('episode'));
+
+		if (!id) return fail(400, { message: 'Missing id.' });
+		if (!Number.isInteger(season) || season < 1) return fail(400, { message: 'Invalid season.' });
+
+		const db = getDb();
+		const [item] = await db
+			.select({
+				tmdbId: watchlistItem.tmdbId,
+				mediaType: watchlistItem.mediaType,
+				watchedAt: watchlistItem.watchedAt,
+				airedSeasons: watchlistItem.airedSeasons,
+				totalSeasons: watchlistItem.totalSeasons
+			})
+			.from(watchlistItem)
+			.where(ownedRow(id, locals.user.id))
+			.limit(1);
+
+		if (!item) return fail(404, { message: 'Item not found.' });
+		if (item.mediaType !== 'tv') return fail(400, { message: 'Only TV shows track episodes.' });
+
+		const details = await safeDetails(item.tmdbId, season);
+		if (!details) return fail(502, { message: 'Could not reach TMDB. Please try again.' });
+
+		const airedSeasons = normalizeAiredSeasons(details.airedSeasons) ?? item.airedSeasons;
+		if (!airedSeasons || season > airedSeasons) {
+			return fail(400, { message: 'That season has not aired yet.' });
+		}
+
+		const target = resolveEpisodeTarget(
+			season,
+			episode,
+			details.episodeCounts[season] ?? null,
+			details.season?.airedCount ?? null
+		);
+
+		const watched =
+			deriveWatched(target.seasonsSeen, airedSeasons) && target.episodesIntoSeason === 0;
+
+		await db
+			.update(watchlistItem)
+			.set({
+				seasonsSeen: target.seasonsSeen,
+				episodesIntoSeason: target.episodesIntoSeason,
+				airedSeasons,
+				totalSeasons: normalizeTotalSeasons(details.seasons) ?? item.totalSeasons,
+				nextSeasonNumber: details.upcomingSeason?.number ?? null,
+				nextSeasonAirDate: details.upcomingSeason?.airDate ?? null,
+				watched,
+				watchedAt: watchedStamp(watched, item.watchedAt)
+			})
+			.where(ownedRow(id, locals.user.id));
+
+		return {
+			seasonsSeen: target.seasonsSeen,
+			episodesIntoSeason: target.episodesIntoSeason,
+			airedSeasons,
+			season,
+			episodesWatched: target.episodesIntoSeason,
+			seasonComplete: target.seasonsSeen >= season
+		};
+	},
+
+	/**
 	 * Set how many seasons of a show have been watched.
 	 *
 	 * The target is absolute rather than a delta, so a double submit or a replayed
@@ -492,6 +570,16 @@ const NO_SEASONS: SeasonInfo = {
  * record when TMDB answered but had nothing usable — the distinction the refresh
  * relies on to choose between "try again later" and "record this and stop".
  */
+/** Details for a show, or null when TMDB could not be reached. */
+async function safeDetails(tmdbId: number, season: number | null = null) {
+	try {
+		return await getDetails('tv', tmdbId, 'US', season);
+	} catch (err) {
+		console.error('Failed to read details for tv/%d:', tmdbId, err);
+		return null;
+	}
+}
+
 async function resolveSeasonInfo(tmdbId: number): Promise<SeasonInfo | null> {
 	try {
 		const details = await getDetails('tv', tmdbId);

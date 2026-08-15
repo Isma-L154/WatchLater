@@ -93,10 +93,11 @@ export const watchlistItem = sqliteTable(
 		watched: integer('watched', { mode: 'boolean' }).notNull().default(false),
 
 		/**
-		 * TV progress, tracked by season rather than by episode.
+		 * TV progress: completed seasons, plus a bookmark inside the next one.
 		 *
-		 * A single counter is enough because series are watched in order, so
-		 * progress is one-dimensional — no join table, no extra query on the list.
+		 * Two integers rather than a row per episode, because series are watched in
+		 * order and a position on a line is all that describes — no join table, no
+		 * extra query on the list.
 		 *
 		 * `totalSeasons` is TMDB's count, snapshotted on save. Three states, all
 		 * meaningful: a positive number is the real count, null means "not known
@@ -115,6 +116,14 @@ export const watchlistItem = sqliteTable(
 		 * show drops back out of "watched" on its own.
 		 */
 		seasonsSeen: integer('seasons_seen').notNull().default(0),
+		/**
+		 * Episodes watched of the season *after* `seasonsSeen` — the bookmark.
+		 *
+		 * Always below that season's length: finishing the last episode rolls into
+		 * `seasonsSeen` instead, so a given position has exactly one encoding. See
+		 * `domain/episodes`.
+		 */
+		episodesIntoSeason: integer('episodes_into_season').notNull().default(0),
 		totalSeasons: integer('total_seasons'),
 		airedSeasons: integer('aired_seasons'),
 		nextSeasonNumber: integer('next_season_number'),
