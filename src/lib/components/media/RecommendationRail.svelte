@@ -62,14 +62,34 @@
 		<Icon name="sparkle" size={16} class="text-brand-hi" />
 		<h2 id={headingId} class="text-sm font-bold tracking-wide text-ink-muted uppercase">
 			{because}
-			<span class="text-ink">{rail.seedTitle}</span>
+			<!-- The label is a label and shouts like the others; the title is data,
+			     and data in capitals stops looking like the name of a thing. -->
+			<span class="text-sm text-ink normal-case">{rail.seedTitle}</span>
 		</h2>
 	</div>
 
+	<!--
+		The right edge fades instead of slicing.
+
+		A rail is always wider than the screen, so some tile is always cut by the
+		container — and a card severed through the middle of its button reads as a
+		rendering fault rather than as "keep scrolling". The mask turns the same
+		pixels into an affordance. The vertical padding is for the hover lift and
+		the card shadow, which `overflow-x` would otherwise clip.
+
+		`scroll-p*` has to repeat the horizontal padding. Snap points align to the
+		*scrollport*, which is the padding box — so mandatory snapping pulled the
+		first card past the page margin and left it flush against the screen edge,
+		out of line with every other card on the page. It only showed up here
+		because a rail short enough not to scroll never snaps.
+	-->
 	<div
-		class="no-scrollbar -mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6"
+		class="no-scrollbar -mx-4 flex snap-x snap-mandatory scroll-pl-4 items-stretch gap-3 overflow-x-auto [mask-image:linear-gradient(to_right,black_calc(100%-3rem),transparent)] px-4 pt-2 pb-3 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
 	>
 		{#each rail.items as item, index (mediaKey(item))}
+			<!-- Stays a block: the tile is stretched by the row, and the card fills
+			     it from there. Making this a flex row would leave the card sizing to
+			     its own content width instead of to the tile. -->
 			<div class="w-[9.5rem] flex-shrink-0 snap-start sm:w-[10.5rem]">
 				<DiscoverCard
 					{item}

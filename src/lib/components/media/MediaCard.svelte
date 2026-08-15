@@ -71,8 +71,18 @@
 	const unreleased = $derived(release.state !== 'released');
 </script>
 
+<!--
+	`h-full` is what keeps a row of cards level.
+
+	A card is as tall as its title needs, so a two-line title makes one tile 20px
+	taller than its neighbours and drops its button below the line they share.
+	Grid and flex containers stretch their *own* children, but every caller wraps
+	this card in something — a scroll-snap tile, a `div` carrying the flip
+	animation — so the stretch lands on the wrapper and stops there. Filling the
+	wrapper passes it the rest of the way down.
+-->
 <article
-	class="group relative flex flex-col overflow-hidden rounded-2xl bg-surface shadow-lg ring-1 shadow-black/20 transition duration-300 ease-[var(--ease-out-soft)] hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40
+	class="group relative flex h-full flex-col overflow-hidden rounded-2xl bg-surface shadow-lg ring-1 shadow-black/20 transition duration-300 ease-[var(--ease-out-soft)] hover:-translate-y-1 hover:shadow-xl hover:shadow-black/40
 		{unreleased ? 'ring-amber/20 hover:ring-amber/40' : 'ring-line hover:ring-brand/40'}"
 >
 	<div class="relative aspect-[2/3] w-full overflow-hidden bg-surface-hi">

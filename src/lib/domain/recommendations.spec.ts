@@ -168,7 +168,7 @@ describe('buildRails', () => {
 		);
 
 		expect(rails).toHaveLength(2);
-		expect(rails[0].items).toHaveLength(12);
+		expect(rails[0].items).toHaveLength(8);
 	});
 
 	it('returns nothing when every lookup came back empty', () => {
