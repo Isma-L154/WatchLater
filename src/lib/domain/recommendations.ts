@@ -107,14 +107,68 @@ function compareSeeds(a: SeedCandidate, b: SeedCandidate): number {
 }
 
 /**
- * Choose which saved titles to ask about.
+ * Which day it is where the viewer is, as a plain count of days.
  *
- * A brand-new list has nothing engaged with yet, so it falls through to the most
- * recently added — the rows churn while the list is two titles long, which is
- * the one moment that costs nothing.
+ * The rows turn over at local midnight, so the boundary has to be the viewer's,
+ * not the server's — a Worker runs in UTC, which for most of the world is the
+ * middle of an afternoon or the small hours. Formatting to `YYYY-MM-DD` in the
+ * target zone and counting from there sidesteps every offset and DST rule,
+ * because the calendar date is exactly the question being asked.
+ *
+ * An unusable zone falls back to UTC rather than throwing: the wrong midnight is
+ * a shrug, a crashed page is not.
  */
-export function pickSeeds(rows: readonly SeedCandidate[], limit = MAX_SEEDS): SeedCandidate[] {
-	return [...rows].sort(compareSeeds).slice(0, limit);
+export function dayNumber(now: Date, timeZone: string): number {
+	let localDate: string;
+	try {
+		// `en-CA` is the locale that formats as YYYY-MM-DD.
+		localDate = new Intl.DateTimeFormat('en-CA', {
+			timeZone,
+			year: 'numeric',
+			month: '2-digit',
+			day: '2-digit'
+		}).format(now);
+	} catch {
+		localDate = now.toISOString().slice(0, 10);
+	}
+
+	return Math.floor(Date.parse(`${localDate}T00:00:00Z`) / 86_400_000);
+}
+
+/** Move the first `by` entries to the back, wrapping. */
+function rotate<T>(items: readonly T[], by: number): T[] {
+	if (items.length === 0) return [];
+	const offset = ((by % items.length) + items.length) % items.length;
+	return [...items.slice(offset), ...items.slice(0, offset)];
+}
+
+/**
+ * Choose which saved titles to ask about, for a given day.
+ *
+ * Ranking picks the *best* seeds; rotation stops the same two winning forever.
+ * A list of twenty watched titles has plenty to say and would otherwise say the
+ * same thing every visit, so the engaged pool is walked one day at a time and
+ * the rows turn over at midnight without anything having to run at midnight.
+ *
+ * Only the engaged pool rotates. Letting the rotation run off the end of it
+ * would eventually seed a day entirely from titles nobody has touched, which is
+ * a worse row than a repeated one — untouched saves are the fallback, never the
+ * scheduled turn.
+ *
+ * A brand-new list has nothing engaged with yet and falls through to the most
+ * recently added. Those rows churn while the list is two titles long, which is
+ * the one moment it costs nothing.
+ */
+export function pickSeeds(
+	rows: readonly SeedCandidate[],
+	limit = MAX_SEEDS,
+	day = 0
+): SeedCandidate[] {
+	const ranked = [...rows].sort(compareSeeds);
+	const engaged = ranked.filter(isEngaged);
+	const untouched = ranked.filter((row) => !isEngaged(row));
+
+	return [...rotate(engaged, day), ...untouched].slice(0, limit);
 }
 
 /** What one seed's lookup came back with. */

@@ -6,6 +6,7 @@ import { watchlistActions } from '$lib/server/watchlist';
 import { mediaKey } from '$lib/domain/media';
 import {
 	buildRails,
+	dayNumber,
 	pickSeeds,
 	type RecommendationRail,
 	type SeedCandidate
@@ -23,17 +24,30 @@ import type { Actions, PageServerLoad } from './$types';
  * database, so it goes out immediately; the suggestions have to wait for the
  * rows that decide which titles to ask about, and then fan out in parallel.
  */
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, platform }) => {
 	const rows = loadSavedRows(locals.user?.id);
+	const today = dayNumber(new Date(), resolveTimeZone(platform));
 
 	const [saved, trending, recommendations] = await Promise.all([
 		rows.then(buildSavedIndex),
 		loadTrending(),
-		rows.then(loadRecommendations)
+		rows.then((all) => loadRecommendations(all, today))
 	]);
 
 	return { saved, trending, recommendations };
 };
+
+/**
+ * The viewer's own timezone, so the rows turn over at their midnight.
+ *
+ * Cloudflare resolves it at the edge alongside the country, so it costs nothing
+ * and asks for no permission. Everywhere else — local development, the tests —
+ * there is no edge to ask, and UTC is the honest default rather than a guess.
+ */
+function resolveTimeZone(platform: App.Platform | undefined): string {
+	const zone = platform?.cf?.timezone;
+	return typeof zone === 'string' && zone.length > 0 ? zone : 'UTC';
+}
 
 /** A saved row as this page reads it — the client only ever sees part of it. */
 type SavedRow = SavedEntry & SeedCandidate;
@@ -100,9 +114,13 @@ function buildSavedIndex(rows: SavedRow[]): Record<string, SavedEntry> {
  *
  * Signed-out visitors and empty lists cost nothing: with no seeds there is
  * nothing to ask, and the whole section simply does not render.
+ *
+ * `today` is what makes the rows turn over at midnight without anything having
+ * to run at midnight: it changes which titles are asked about, and the answers
+ * themselves are cached at the edge for a day.
  */
-async function loadRecommendations(rows: SavedRow[]): Promise<RecommendationRail[]> {
-	const seeds = pickSeeds(rows);
+async function loadRecommendations(rows: SavedRow[], today: number): Promise<RecommendationRail[]> {
+	const seeds = pickSeeds(rows, undefined, today);
 	if (seeds.length === 0) return [];
 
 	const results = await Promise.all(
