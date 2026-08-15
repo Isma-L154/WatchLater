@@ -11,6 +11,7 @@ const entry = (over: Partial<WatchlistEntry> & { title: string }): WatchlistEntr
 	voteAverage: null,
 	releaseDate: null,
 	seasonsSeen: 0,
+	episodesIntoSeason: 0,
 	totalSeasons: null,
 	airedSeasons: null,
 	nextSeasonNumber: null,
@@ -67,6 +68,28 @@ describe('applyWatchlistView — filtering', () => {
 	it('filters by "in progress" status — started shows that are not finished', () => {
 		const result = applyWatchlistView(items, { ...baseView, status: 'inProgress' }, now);
 		expect(result.map((i) => i.title)).toEqual(['Andor']);
+	});
+
+	/**
+	 * The regression episode tracking introduced: progress inside season one leaves
+	 * `seasonsSeen` at zero, so counting seasons alone reported "not started" for a
+	 * show the viewer is demonstrably in the middle of.
+	 */
+	it('counts a part-watched first season as in progress', () => {
+		const partWay = [
+			entry({
+				title: 'Silo',
+				mediaType: 'tv',
+				seasonsSeen: 0,
+				episodesIntoSeason: 4,
+				totalSeasons: 3,
+				airedSeasons: 3
+			})
+		];
+
+		const result = applyWatchlistView(partWay, { ...baseView, status: 'inProgress' }, now);
+		expect(result.map((i) => i.title)).toEqual(['Silo']);
+		expect(countByStatus(partWay, now).inProgress).toBe(1);
 	});
 
 	it('filters by "upcoming" status', () => {

@@ -7,8 +7,9 @@ import type { MediaType } from '../types';
  *
  * "Watched / not watched" is the whole truth for a film, but for a six-season
  * show it collapses "halfway through season 3" into a state that is simply
- * wrong. Progress is tracked per season — not per episode, which would mean an
- * extra request per season and a lot of tapping for precision nobody needs.
+ * wrong. This module counts seasons; `domain/episodes` refines the position
+ * inside the one in progress, and defers to the count kept here for everything
+ * coarser — caught-up, archiving, the upcoming view.
  *
  * The ceiling is the number of seasons that have *aired*, never the number that
  * exist. TMDB counts announced seasons, so measuring against the total let you

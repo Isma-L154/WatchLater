@@ -4,7 +4,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import MediaCard from './MediaCard.svelte';
-	import { getSeasonProgress } from '$lib/domain/progress';
+	import { hasStarted, progressNote } from '$lib/domain/episodes';
 	import type { MediaResult, SavedEntry } from '$lib/types';
 
 	/**
@@ -33,8 +33,10 @@
 	 */
 	const note = $derived.by(() => {
 		if (!saved) return undefined;
-		const progress = getSeasonProgress({ ...saved, mediaType: item.mediaType });
-		return progress.trackable && progress.state !== 'notStarted' ? progress.label : undefined;
+		const entry = { ...saved, mediaType: item.mediaType };
+		// Unlike My List, a title with no progress says nothing here: the footer
+		// already reads "In your list", and "Not started" would only repeat it.
+		return hasStarted(entry) ? progressNote(entry) : undefined;
 	});
 </script>
 

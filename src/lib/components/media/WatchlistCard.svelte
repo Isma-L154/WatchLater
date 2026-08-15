@@ -5,7 +5,7 @@
 	import MediaCard from './MediaCard.svelte';
 	import SeasonTracker from './SeasonTracker.svelte';
 	import { getSeasonProgress } from '$lib/domain/progress';
-	import { getEpisodePosition } from '$lib/domain/episodes';
+	import { progressNote } from '$lib/domain/episodes';
 	import { getReleaseInfo } from '$lib/domain/release';
 	import {
 		daysUntilArchive,
@@ -62,7 +62,6 @@
 	);
 
 	const progress = $derived(getSeasonProgress(item));
-	const position = $derived(getEpisodePosition(item));
 
 	// "Mark as watched" still works on an unreleased title (premieres exist), but
 	// it shouldn't be the loudest thing on a card for something that isn't out.
@@ -83,16 +82,15 @@
 	});
 
 	/**
-	 * The line under the title. Episode position wins when there is one: "S3E5" is
-	 * a more precise answer to "where am I" than "Season 3 of 5", and it is the
-	 * thing the primary button is about to act on.
+	 * The line under the title. Being caught up *and* knowing when the next season
+	 * lands is more than the shared note can say, so that one case is answered
+	 * here; everything else defers to the rule every surface shares.
 	 */
 	const note = $derived.by(() => {
 		if (progress.state === 'caughtUp' && nextSeason) {
 			return `Caught up · S${nextSeason.number} ${nextSeason.label}`;
 		}
-		if (position.trackable && !position.upToDate) return `Next: ${position.nextLabel}`;
-		return progress.trackable ? progress.label : undefined;
+		return progressNote(item);
 	});
 </script>
 
