@@ -13,6 +13,7 @@
 	import RecommendationRail from '$lib/components/media/RecommendationRail.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
+	import Seo from '$lib/components/Seo.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { TrendingFeed } from '$lib/stores/trending.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -102,13 +103,28 @@
 	}
 </script>
 
-<svelte:head>
-	<title>Discover — WatchLater</title>
-	<meta
-		name="description"
-		content="Search movies and TV shows, see what's trending this week, and save titles to your personal watch-later list."
-	/>
-</svelte:head>
+<!--
+	The one page a search engine can actually see, so it carries the description of
+	the whole app rather than of this screen — and the structured data that lets it
+	be understood as a free application instead of an untyped page of links.
+-->
+<Seo
+	title="WatchLater — track the films and series you mean to watch"
+	description="A free watchlist for films and TV. Track series down to the episode you are on, see where to watch anything, and never mark a season watched before it has aired."
+	origin={page.data.origin}
+	path="/"
+	schema={{
+		'@context': 'https://schema.org',
+		'@type': 'WebApplication',
+		name: 'WatchLater',
+		url: page.data.origin,
+		applicationCategory: 'EntertainmentApplication',
+		operatingSystem: 'Any',
+		description:
+			'A free watchlist for films and TV shows, with episode-level progress tracking and streaming availability.',
+		offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
+	}}
+/>
 
 <div class="py-5 sm:py-8">
 	<h1 class="font-display text-2xl font-extrabold sm:text-3xl">Discover</h1>
