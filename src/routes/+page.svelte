@@ -10,6 +10,7 @@
 	import PosterGrid from '$lib/components/media/PosterGrid.svelte';
 	import PosterGridSkeleton from '$lib/components/media/PosterGridSkeleton.svelte';
 	import DiscoverCard from '$lib/components/media/DiscoverCard.svelte';
+	import RecommendationRail from '$lib/components/media/RecommendationRail.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
@@ -61,6 +62,14 @@
 	 */
 	const allTrending = $derived(dedupeByKey([...data.trending.items, ...trending.extra]));
 
+	/**
+	 * Suggestions built from the list, shown only on the default view.
+	 *
+	 * Once somebody is searching they have said what they are looking for, and a
+	 * row of "you might also like" above the answer is just noise in front of it.
+	 */
+	const recommendations = $derived(search.active || search.error ? [] : data.recommendations);
+
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
 
 	const selectedSaved = $derived(selected ? (data.saved[mediaKey(selected)] ?? null) : null);
@@ -109,7 +118,30 @@
 		<SearchBar {search} />
 	</div>
 
-	<section class="mt-7">
+	<!--
+		Personal before popular. These rows are the only part of Discover that gets
+		better the longer somebody uses the app, so they lead — and each one is a
+		single scrollable line, which keeps trending within reach rather than a
+		screen away.
+	-->
+	{#if recommendations.length > 0}
+		<div class="mt-7">
+			{#each recommendations as rail, index (rail.seedKey)}
+				<RecommendationRail
+					{rail}
+					{signedIn}
+					priority={index === 0}
+					saved={data.saved}
+					onSelect={(item) => (selected = item)}
+					onAdd={(item) => withToast(`Added “${item.title}”`)}
+				/>
+			{/each}
+		</div>
+	{/if}
+
+	<!-- The rails already carry their own bottom margin, so the gap is theirs to
+	     set when they are present. -->
+	<section class={recommendations.length > 0 ? '' : 'mt-7'}>
 		{#if search.error}
 			<p
 				class="flex items-center gap-2 rounded-xl bg-rose/10 px-4 py-3 text-sm text-rose ring-1 ring-rose/20"

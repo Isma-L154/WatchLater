@@ -1,3 +1,4 @@
+import { getSeasonProgress, type TrackableEntry } from './progress';
 import type { MediaType } from '../types';
 
 /**
@@ -72,6 +73,42 @@ export function getEpisodePosition(entry: EpisodeEntry): EpisodePosition {
 		nextLabel: `S${season}E${episodesWatched + 1}`,
 		upToDate
 	};
+}
+
+/**
+ * Whether anything has been watched at all.
+ *
+ * Both counters have to be read. Someone four episodes into season one has
+ * `seasonsSeen` at zero, and treating that as "not started" is what kept them
+ * out of the continue-watching rail — the one place they most needed to be.
+ */
+export function hasStarted(
+	entry: Pick<EpisodeEntry, 'seasonsSeen' | 'episodesIntoSeason'>
+): boolean {
+	return entry.seasonsSeen > 0 || entry.episodesIntoSeason > 0;
+}
+
+/** Everything the progress note reads: the season counter plus the bookmark. */
+export type ProgressEntry = TrackableEntry & EpisodeEntry;
+
+/**
+ * The one-line answer to "where am I", shared by every surface that shows one.
+ *
+ * Episode position wins whenever there is one: "S3E5" is a more precise answer
+ * than "Season 3 of 5", and it names the exact thing to play next. The season
+ * summary is the fallback, and it is all there is left to say once a show is
+ * caught up or finished — there is no next episode to point at.
+ *
+ * Shared rather than derived per component because three surfaces render this
+ * line, and three copies of the rule is exactly how the card came to say
+ * "Next: S2E5" while the rail above it still said "Season 1 of 3".
+ */
+export function progressNote(entry: ProgressEntry): string | undefined {
+	const position = getEpisodePosition(entry);
+	if (position.trackable && !position.upToDate) return `Next: ${position.nextLabel}`;
+
+	const progress = getSeasonProgress(entry);
+	return progress.trackable ? progress.label : undefined;
 }
 
 /** The result of advancing or rewinding, as absolute counters to store. */

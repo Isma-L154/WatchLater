@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import SeasonTracker from './SeasonTracker.svelte';
 	import { getSeasonProgress } from '$lib/domain/progress';
+	import { progressNote } from '$lib/domain/episodes';
 	import { posterUrl } from '$lib/tmdb-image';
 	import type { WatchlistItem } from '$lib/server/db/schema';
 
@@ -40,6 +41,7 @@
 		>
 			{#each items as item (item.id)}
 				{@const progress = getSeasonProgress(item)}
+				{@const note = progressNote(item)}
 				{@const poster = posterUrl(item.posterPath, 'w185')}
 				<article
 					class="flex w-[17rem] flex-shrink-0 snap-start gap-3 rounded-2xl bg-surface p-3 ring-1 ring-line transition-colors duration-200 hover:ring-brand/40 sm:w-[19rem]"
@@ -74,7 +76,9 @@
 							>
 								{item.title}
 							</button>
-							<p class="mt-0.5 text-[11px] text-ink-faint">{progress.label}</p>
+							{#if note}
+								<p class="mt-0.5 text-[11px] text-ink-faint">{note}</p>
+							{/if}
 						</div>
 
 						<SeasonTracker

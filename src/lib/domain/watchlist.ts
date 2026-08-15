@@ -1,4 +1,5 @@
 import { isTrackable } from './progress';
+import { hasStarted } from './episodes';
 import { hasUpcoming, upcomingSortKey } from './upcoming';
 import type { MediaType } from '../types';
 
@@ -15,6 +16,8 @@ export interface WatchlistEntry {
 	voteAverage: number | null;
 	releaseDate: string | null;
 	seasonsSeen: number;
+	/** Episodes into the season after `seasonsSeen` — see `domain/episodes`. */
+	episodesIntoSeason: number;
 	totalSeasons: number | null;
 	airedSeasons: number | null;
 	/** The next season still to premiere; null when there is none. */
@@ -91,9 +94,15 @@ export function applyWatchlistView<T extends WatchlistEntry>(
 	return sorted;
 }
 
-/** A show that has been started but not finished — "what was I in the middle of?" */
+/**
+ * A show that has been started but not finished — "what was I in the middle of?"
+ *
+ * "Started" is the episode bookmark as well as the season counter, or a show you
+ * are three episodes into would answer the question correctly on its own card
+ * and still be missing from the rail that asks it.
+ */
 export function isInProgress(item: WatchlistEntry): boolean {
-	return isTrackable(item) && item.seasonsSeen > 0 && !item.watched;
+	return isTrackable(item) && hasStarted(item) && !item.watched;
 }
 
 /**

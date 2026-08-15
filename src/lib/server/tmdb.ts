@@ -354,6 +354,34 @@ export async function getDetails(
 	};
 }
 
+/**
+ * Titles TMDB considers close to one already on the list.
+ *
+ * This is the same "what should I watch" question trending answers, asked of a
+ * far better source: the list itself. Trending is identical for every visitor,
+ * so it is the one part of Discover that can never get more relevant the longer
+ * somebody uses the app.
+ *
+ * The endpoint is per-title and one page deep — twenty suggestions is already
+ * more than a rail shows, and which titles are worth asking about is a decision
+ * that belongs to `domain/recommendations`, not here.
+ */
+export async function getRecommendations(mediaType: MediaType, id: number): Promise<MediaResult[]> {
+	const data = await tmdbFetch<TmdbPaginatedResponse>(`/${mediaType}/${id}/recommendations`, {
+		language: 'en-US',
+		page: '1'
+	});
+
+	// Recommendations for a film are overwhelmingly films, but TMDB does mix in
+	// the odd show, so the per-result type wins and the seed's is only a fallback.
+	return data.results.map((raw) =>
+		normalize(
+			raw,
+			raw.media_type === 'movie' || raw.media_type === 'tv' ? raw.media_type : mediaType
+		)
+	);
+}
+
 /** One page of trending titles, plus whether another page exists. */
 export interface TrendingPage {
 	results: MediaResult[];

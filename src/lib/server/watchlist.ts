@@ -200,6 +200,12 @@ export async function refreshSeasonData(items: WatchlistRow[]): Promise<Watchlis
 				nextSeasonNumber: info.nextSeasonNumber,
 				nextSeasonAirDate: info.nextSeasonAirDate,
 				seasonsSeen,
+				/**
+				 * The bookmark only survives if the season counter did. A downward
+				 * clamp means TMDB corrected the season list, so "six episodes into
+				 * the next one" now points at a season that no longer exists.
+				 */
+				episodesIntoSeason: seasonsSeen === source.seasonsSeen ? source.episodesIntoSeason : 0,
 				watched,
 				watchedAt: watchedStamp(watched, source.watchedAt)
 			};
@@ -319,6 +325,13 @@ export const watchlistActions = {
 			.set({
 				watched,
 				watchedAt: watchedStamp(watched, item.watchedAt),
+				/**
+				 * The toggle speaks in whole seasons, so it lands the position on a
+				 * season boundary and the bookmark goes with it. Left behind, it would
+				 * claim episodes of a season the toggle just moved past — and a show
+				 * marked watched would still be advertising a next episode.
+				 */
+				episodesIntoSeason: 0,
 				...(ceiling ? { seasonsSeen: watched ? ceiling : Math.max(ceiling - 1, 0) } : {})
 			})
 			.where(ownedRow(id, locals.user.id));
@@ -519,6 +532,9 @@ export const watchlistActions = {
 			.update(watchlistItem)
 			.set({
 				seasonsSeen,
+				// Same reasoning as the toggle: this control names a season, so the
+				// stored position is that season's boundary and nothing finer.
+				episodesIntoSeason: 0,
 				airedSeasons,
 				watched,
 				watchedAt: watchedStamp(watched, item.watchedAt),

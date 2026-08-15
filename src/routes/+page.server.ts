@@ -1,23 +1,70 @@
 import { eq } from 'drizzle-orm';
 import { getDb } from '$lib/server/db';
 import { watchlistItem } from '$lib/server/db/schema';
-import { getTrending } from '$lib/server/tmdb';
+import { getRecommendations, getTrending } from '$lib/server/tmdb';
 import { watchlistActions } from '$lib/server/watchlist';
+import { mediaKey } from '$lib/domain/media';
+import {
+	buildRails,
+	pickSeeds,
+	type RecommendationRail,
+	type SeedCandidate
+} from '$lib/domain/recommendations';
 import type { MediaResult, SavedEntry } from '$lib/types';
 import type { Actions, PageServerLoad } from './$types';
 
 /**
  * Discover: what to watch next.
  *
- * Trending is public — browsing works signed out — but the saved-state overlay
- * is not. We fetch only the columns needed to answer "is this already on my
- * list, and how far in am I?", never the full rows: the poster, overview and
- * rating are already in the TMDB payload this page renders.
+ * Trending is public — browsing works signed out — but everything derived from
+ * the list is not: the saved-state overlay, and the suggestions built from it.
+ *
+ * The three run as concurrently as they can. Trending owes nothing to the
+ * database, so it goes out immediately; the suggestions have to wait for the
+ * rows that decide which titles to ask about, and then fan out in parallel.
  */
 export const load: PageServerLoad = async ({ locals }) => {
-	const [saved, trending] = await Promise.all([loadSavedIndex(locals.user?.id), loadTrending()]);
-	return { saved, trending };
+	const rows = loadSavedRows(locals.user?.id);
+
+	const [saved, trending, recommendations] = await Promise.all([
+		rows.then(buildSavedIndex),
+		loadTrending(),
+		rows.then(loadRecommendations)
+	]);
+
+	return { saved, trending, recommendations };
 };
+
+/** A saved row as this page reads it — the client only ever sees part of it. */
+type SavedRow = SavedEntry & SeedCandidate;
+
+/**
+ * Every saved row, in one query.
+ *
+ * Two features read it: the saved-state overlay, and seed selection. The columns
+ * they need barely overlap, but a second round-trip to Turso to fetch four more
+ * columns of rows already in hand would cost more than carrying them.
+ */
+async function loadSavedRows(userId: string | undefined): Promise<SavedRow[]> {
+	if (!userId) return [];
+
+	return getDb()
+		.select({
+			id: watchlistItem.id,
+			tmdbId: watchlistItem.tmdbId,
+			mediaType: watchlistItem.mediaType,
+			title: watchlistItem.title,
+			watched: watchlistItem.watched,
+			seasonsSeen: watchlistItem.seasonsSeen,
+			episodesIntoSeason: watchlistItem.episodesIntoSeason,
+			totalSeasons: watchlistItem.totalSeasons,
+			airedSeasons: watchlistItem.airedSeasons,
+			addedAt: watchlistItem.addedAt,
+			watchedAt: watchlistItem.watchedAt
+		})
+		.from(watchlistItem)
+		.where(eq(watchlistItem.userId, userId));
+}
 
 /**
  * The list as a lookup keyed by `"<tmdbId>:<mediaType>"`.
@@ -28,30 +75,14 @@ export const load: PageServerLoad = async ({ locals }) => {
  * an answer for.
  *
  * That means the payload grows with the list, so it carries the six columns the
- * badge and the detail sheet actually read and nothing else: no overview, no
- * poster path, no timestamps. At a realistic couple of hundred titles that is a
- * few KB.
+ * badge and the detail sheet actually read and nothing else: no title, no
+ * timestamps, none of the columns seed selection needed. At a realistic couple
+ * of hundred titles that is a few KB.
  */
-async function loadSavedIndex(userId: string | undefined): Promise<Record<string, SavedEntry>> {
-	if (!userId) return {};
-
-	const rows = await getDb()
-		.select({
-			id: watchlistItem.id,
-			tmdbId: watchlistItem.tmdbId,
-			mediaType: watchlistItem.mediaType,
-			watched: watchlistItem.watched,
-			seasonsSeen: watchlistItem.seasonsSeen,
-			episodesIntoSeason: watchlistItem.episodesIntoSeason,
-			totalSeasons: watchlistItem.totalSeasons,
-			airedSeasons: watchlistItem.airedSeasons
-		})
-		.from(watchlistItem)
-		.where(eq(watchlistItem.userId, userId));
-
+function buildSavedIndex(rows: SavedRow[]): Record<string, SavedEntry> {
 	return Object.fromEntries(
 		rows.map((row) => [
-			`${row.tmdbId}:${row.mediaType}`,
+			mediaKey(row),
 			{
 				id: row.id,
 				watched: row.watched,
@@ -62,6 +93,36 @@ async function loadSavedIndex(userId: string | undefined): Promise<Record<string
 			}
 		])
 	);
+}
+
+/**
+ * Suggestions drawn from the list, as rows of "because you watched X".
+ *
+ * Signed-out visitors and empty lists cost nothing: with no seeds there is
+ * nothing to ask, and the whole section simply does not render.
+ */
+async function loadRecommendations(rows: SavedRow[]): Promise<RecommendationRail[]> {
+	const seeds = pickSeeds(rows);
+	if (seeds.length === 0) return [];
+
+	const results = await Promise.all(
+		seeds.map(async (seed) => ({ seed, items: await safeRecommendations(seed) }))
+	);
+
+	return buildRails(results, new Set(rows.map(mediaKey)));
+}
+
+/**
+ * Best-effort per seed: a failed lookup costs its own row, never the page. The
+ * extra seed `pickSeeds` returns is what makes that cheap to absorb.
+ */
+async function safeRecommendations(seed: SeedCandidate): Promise<MediaResult[]> {
+	try {
+		return await getRecommendations(seed.mediaType, seed.tmdbId);
+	} catch (err) {
+		console.error('Failed to load recommendations for %s/%d:', seed.mediaType, seed.tmdbId, err);
+		return [];
+	}
 }
 
 /**

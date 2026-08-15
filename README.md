@@ -11,7 +11,8 @@ track of where you are in a series. Mobile-first, and free to host.
 
 - **Sign in with Google** — your list is private to your account.
 - **Search and trending**, proxied server-side so the TMDB token never reaches the browser.
-- **Season tracking** — seasons that have not aired cannot be ticked off, so a show is never marked watched ahead of broadcast. Finishing the aired ones marks you _caught up_, and a new season brings the show back on its own. ([design notes](docs/season-progress.md))
+- **Suggestions from your list** — rows of "because you watched X", built from what you actually finished rather than from what is popular this week.
+- **Season and episode tracking** — a bookmark down to the episode, and nothing that has not aired can be ticked off, so a show is never marked watched ahead of broadcast. Finishing the aired seasons marks you _caught up_, and a new season brings the show back on its own. ([design notes](docs/season-progress.md))
 - **Where to watch** — streaming, rental and purchase options for your country.
 - **Coming soon** — pending films and seasons grouped by how soon they arrive.
 - **Auto-archive** — optionally tidy watched titles away after 7, 30 or 90 days. Archived, never deleted.
