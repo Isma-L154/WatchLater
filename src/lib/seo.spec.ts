@@ -3,7 +3,7 @@ import { schemaScript, serializeSchema } from './seo';
 
 describe('serializeSchema', () => {
 	it('produces JSON a parser reads back unchanged', () => {
-		const schema = { '@type': 'WebApplication', name: 'WatchLater' };
+		const schema = { '@type': 'WebApplication', name: 'Nextsode' };
 		expect(JSON.parse(serializeSchema(schema))).toEqual(schema);
 	});
 

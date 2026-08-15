@@ -79,7 +79,7 @@
 					type="submit"
 					class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-semibold text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-hi active:scale-[0.98]"
 				>
-					<Icon name="plus" size={14} stroke={2.5} /> Watch Later
+					<Icon name="plus" size={14} stroke={2.5} /> Save
 				</button>
 			</form>
 		{/if}

@@ -53,17 +53,14 @@
 	{/if}
 
 	<meta property="og:type" content="website" />
-	<meta property="og:site_name" content="WatchLater" />
+	<meta property="og:site_name" content="Nextsode" />
 	<meta property="og:title" content={title} />
 	<meta property="og:description" content={description} />
 	<meta property="og:url" content={canonical} />
 	<meta property="og:image" content={image} />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
-	<meta
-		property="og:image:alt"
-		content="WatchLater — everything you meant to watch, in one place."
-	/>
+	<meta property="og:image:alt" content="Nextsode — never lose your place in a series." />
 	<meta property="og:locale" content="en_US" />
 
 	<!-- X and several others still read the twitter:* names rather than og:*. -->

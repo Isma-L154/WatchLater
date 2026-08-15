@@ -8,4 +8,4 @@ Disallow: /auth/
 # A private list signed in, a sign-in prompt signed out. Neither is a result.
 Disallow: /watchlist
 
-Sitemap: https://watchlater.ilsproj.workers.dev/sitemap.xml
+Sitemap: https://nextsode.ilsproj.workers.dev/sitemap.xml

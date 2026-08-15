@@ -83,7 +83,7 @@
 					<Icon name="film" size={18} />
 				</span>
 				<span class="font-display text-lg font-extrabold tracking-tight sm:text-xl">
-					Watch<span class="text-brand-hi">Later</span>
+					Next<span class="text-brand-hi">sode</span>
 				</span>
 			</a>
 
