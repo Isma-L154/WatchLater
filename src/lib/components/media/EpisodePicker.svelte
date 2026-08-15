@@ -3,7 +3,7 @@
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
-	import { formatRuntime } from '$lib/tmdb-image';
+	import { formatRuntime } from '$lib/format/tmdb-image';
 	import type { SeasonEpisodes } from '$lib/types';
 
 	/**

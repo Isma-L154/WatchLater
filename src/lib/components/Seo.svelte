@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { schemaScript } from '$lib/seo';
+	import { schemaScript } from '$lib/format/seo';
 
 	/**
 	 * The tags that decide how a page looks outside the app.
@@ -34,7 +34,7 @@
 
 	let { title, description, origin, path, indexable = true, schema }: Props = $props();
 
-	/** The JSON-LD element, escaped so it cannot end itself. See `$lib/seo`. */
+	/** The JSON-LD element, escaped so it cannot end itself. See `$lib/format/seo`. */
 	const schemaJson = $derived(schema ? schemaScript(schema) : null);
 
 	const canonical = $derived(`${origin}${path}`);
@@ -73,7 +73,7 @@
 		<!--
 			`@html` is the only way to emit a typed script element from a component,
 			since Svelte claims any real script tag written here. The string is built
-			in `$lib/seo` from JSON we construct and escape — never markup — so the
+			in `$lib/format/seo` from JSON we construct and escape — never markup — so the
 			rule suppressed below is guarding against something that cannot occur.
 		-->
 		<!-- eslint-disable-next-line svelte/no-at-html-tags -->

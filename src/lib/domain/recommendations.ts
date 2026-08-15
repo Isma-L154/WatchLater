@@ -4,14 +4,11 @@ import type { MediaResult, MediaType } from '../types';
 
 /**
  * "Because you watched X" — discovery built from the list rather than from what
- * happens to be popular this week.
+ * is popular this week, which is the same twenty titles for everybody and so
+ * the one part of Discover that cannot improve with use.
  *
- * Trending is the same twenty titles for everybody, which makes it the one part
- * of Discover that cannot improve as somebody uses the app. The list is the
- * signal that is already there and going unread.
- *
- * Everything here is pure: which titles are worth asking TMDB about, and what
- * survives from the answers. The requests themselves belong to the loader.
+ * Pure: which titles are worth asking about, and what survives the answers. The
+ * requests themselves belong to the loader.
  */
 
 /** The columns seed selection reads — structurally a subset of a watchlist row. */
@@ -27,12 +24,9 @@ export interface SeedCandidate {
 }
 
 /**
- * How the seed came to be one, which is how the row gets worded.
- *
- * The three are meaningfully different claims and exactly one is ever true, so
- * the heading states that one: telling somebody they "saved" a show they are
- * four episodes into is technically defensible and still reads as the app not
- * having noticed.
+ * How the seed came to be one, which is how the row gets worded. Telling
+ * somebody they "saved" a show they are four episodes into is defensible and
+ * still reads as the app not having noticed.
  */
 export type SeedState = 'watched' | 'watching' | 'saved';
 
@@ -46,11 +40,7 @@ export interface RecommendationRail {
 	items: MediaResult[];
 }
 
-/**
- * How many titles to ask TMDB about. They are requested in parallel, so this
- * costs request count rather than wall-clock time — which buys a spare in case a
- * seed comes back with nothing usable.
- */
+/** Requested in parallel, so the third costs no wall-clock time — it is a spare. */
 export const MAX_SEEDS = 3;
 
 /** How many rows to render. Two is enough to be useful without burying trending. */
@@ -69,13 +59,9 @@ export const MIN_RAIL_ITEMS = 4;
 export const MAX_RAIL_ITEMS = 8;
 
 /**
- * Whether a title says anything about taste.
- *
- * Saving something is a guess; watching it — or getting far enough in to still
- * be watching it — is a verdict. This is also what keeps the rows *stable*:
- * seeding from recently-added would reshuffle the whole section every time
- * somebody saved a title, which is the exact moment they are least interested
- * in the page rearranging itself.
+ * Whether a title says anything about taste. Saving is a guess; watching is a
+ * verdict — and seeding from verdicts is what keeps the rows still, since
+ * saving a title then cannot reshuffle the section under the reader.
  */
 function isEngaged(row: SeedCandidate): boolean {
 	return row.watched || hasStarted(row);
@@ -93,11 +79,8 @@ function time(date: Date | null): number {
 }
 
 /**
- * Most recent verdict first, falling back to the most recent guess.
- *
- * Titles somebody engaged with always outrank ones they merely saved, however
- * long ago — a show finished last month is a better description of taste than
- * something added this morning on a whim.
+ * Most recent verdict first, falling back to the most recent guess. A show
+ * finished last month describes taste better than one added this morning.
  */
 function compareSeeds(a: SeedCandidate, b: SeedCandidate): number {
 	const engagedA = isEngaged(a);
@@ -186,15 +169,12 @@ export interface RailOptions {
 /**
  * Turn raw lookups into the rows to render.
  *
- * Two filters do the real work. Anything already saved is dropped, because a
- * suggestion you have already made is not a suggestion — and that includes
- * titles suggested by an earlier rail, so two rows never overlap. Anything
- * without a poster is dropped as well: a rail is almost entirely artwork, and a
- * placeholder tile reads as something broken rather than as a missing image.
+ * Two filters do the work. Already-saved titles go, including ones an earlier
+ * row already suggested, so two rows never overlap. Poster-less titles go too:
+ * a placeholder in a wall of artwork reads as broken rather than as missing.
  *
- * A row that survives all that with too little left is discarded whole. Three
- * suggestions under a heading looks like the feature failed, and no row at all
- * is a cleaner answer than a thin one.
+ * A row left too thin is discarded whole — no row is a cleaner answer than a
+ * row of three under a heading.
  */
 export function buildRails(
 	results: readonly SeedResult[],

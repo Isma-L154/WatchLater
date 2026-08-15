@@ -5,7 +5,7 @@
 	import SeasonTracker from './SeasonTracker.svelte';
 	import { getSeasonProgress } from '$lib/domain/progress';
 	import { progressNote } from '$lib/domain/episodes';
-	import { posterUrl } from '$lib/tmdb-image';
+	import { posterUrl } from '$lib/format/tmdb-image';
 	import type { WatchlistItem } from '$lib/server/db/schema';
 
 	/**
