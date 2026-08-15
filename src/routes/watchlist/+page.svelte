@@ -82,6 +82,7 @@
 					id: item.id,
 					watched: item.watched,
 					seasonsSeen: item.seasonsSeen,
+					episodesIntoSeason: item.episodesIntoSeason,
 					totalSeasons: item.totalSeasons,
 					airedSeasons: item.airedSeasons
 				}

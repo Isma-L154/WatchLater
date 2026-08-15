@@ -36,6 +36,13 @@
       "when": 1786586167060,
       "tag": "0004_rainy_the_enforcers",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786760754883,
+      "tag": "0005_chilly_roland_deschain",
+      "breakpoints": true
     }
   ]
 }
