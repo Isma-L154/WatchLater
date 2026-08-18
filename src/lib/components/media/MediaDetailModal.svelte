@@ -11,7 +11,7 @@
 	import CastRow from './CastRow.svelte';
 	import { getEpisodePosition } from '$lib/domain/episodes';
 	import { MediaDetailsRequest } from '$lib/stores/details.svelte';
-	import type { MediaType, SavedEntry } from '$lib/types';
+	import type { MediaResult, MediaType, SavedEntry } from '$lib/types';
 
 	/**
 	 * Everything known about one title, and the things you can do to it.
@@ -31,10 +31,21 @@
 		signedIn: boolean;
 		/** ISO country for streaming availability, resolved at the edge. */
 		country: string;
+		/**
+		 * Follow a link out of this sheet into another title's — currently only
+		 * from a cast member's filmography.
+		 *
+		 * Handed up to the page rather than handled here, because the page owns
+		 * which title is open. Swapping it there reuses this one sheet; doing it
+		 * internally would leave the page's own selection stale, and stacking a
+		 * second sheet would put two focus traps and two Escape handlers on the
+		 * same window.
+		 */
+		onSelectTitle: (item: MediaResult) => void;
 		onClose: () => void;
 	}
 
-	let { tmdbId, mediaType, saved, signedIn, country, onClose }: Props = $props();
+	let { tmdbId, mediaType, saved, signedIn, country, onSelectTitle, onClose }: Props = $props();
 
 	const request = new MediaDetailsRequest();
 
@@ -140,7 +151,7 @@
 			{/if}
 
 			<SaveControl {details} {saved} {signedIn} />
-			<CastRow cast={details.cast} />
+			<CastRow cast={details.cast} title={details} {onSelectTitle} />
 		</div>
 	{/if}
 </ModalSheet>

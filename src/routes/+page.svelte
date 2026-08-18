@@ -290,6 +290,7 @@
 		saved={selectedSaved}
 		{signedIn}
 		country={page.data.country}
+		onSelectTitle={(item) => (selected = item)}
 		onClose={() => (selected = null)}
 	/>
 {/if}

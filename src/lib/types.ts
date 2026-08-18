@@ -46,9 +46,27 @@ export interface SavedEntry {
 
 /** A single cast member, as shown in the detail view. */
 export interface CastMember {
+	/** TMDB person id — what the filmography panel is fetched by. */
+	id: number;
 	name: string;
 	character: string;
 	profilePath: string | null;
+}
+
+/** One title from a person's career, as shown in the filmography panel. */
+export interface PersonCredit extends MediaResult {
+	/** What they played in it, when TMDB knows. */
+	character: string | null;
+}
+
+/** A person and the handful of titles worth recognising them from. */
+export interface PersonFilmography {
+	id: number;
+	name: string;
+	profilePath: string | null;
+	/** e.g. "Acting", "Directing" — what TMDB files them under. */
+	knownFor: string | null;
+	credits: PersonCredit[];
 }
 
 /** A streaming service offering a title, for the "where to watch" row. */
