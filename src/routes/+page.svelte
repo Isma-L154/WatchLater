@@ -12,13 +12,15 @@
 	import DiscoverCard from '$lib/components/media/DiscoverCard.svelte';
 	import RecommendationRail from '$lib/components/media/RecommendationRail.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
+	import PeopleRail from '$lib/components/media/PeopleRail.svelte';
+	import PersonSheet from '$lib/components/media/PersonSheet.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { TrendingFeed } from '$lib/stores/trending.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { dedupeByKey, mediaKey } from '$lib/domain/media';
-	import type { MediaType } from '$lib/types';
+	import type { MediaType, PersonResult } from '$lib/types';
 	import type { PageData } from './$types';
 
 	/**
@@ -72,6 +74,25 @@
 	const recommendations = $derived(search.active || search.error ? [] : data.recommendations);
 
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
+
+	/**
+	 * The person whose sheet is open, if any.
+	 *
+	 * Held apart from `selected` but never alongside it: two `ModalSheet`s on
+	 * screen at once would each answer Escape and each trap Tab, so opening one
+	 * closes the other rather than stacking.
+	 */
+	let selectedPerson = $state<PersonResult | null>(null);
+
+	function openPerson(person: PersonResult) {
+		selected = null;
+		selectedPerson = person;
+	}
+
+	function openTitle(item: { tmdbId: number; mediaType: MediaType }) {
+		selectedPerson = null;
+		selected = item;
+	}
 
 	const selectedSaved = $derived(selected ? (data.saved[mediaKey(selected)] ?? null) : null);
 
@@ -148,7 +169,7 @@
 					{signedIn}
 					priority={index === 0}
 					saved={data.saved}
-					onSelect={(item) => (selected = item)}
+					onSelect={openTitle}
 					onAdd={(item) => withToast(`Added “${item.title}”`)}
 				/>
 			{/each}
@@ -166,16 +187,17 @@
 				{search.error}
 			</p>
 		{:else if search.active}
-			<div class="mb-3 flex items-baseline justify-between gap-3">
-				<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Search results</h2>
-				{#if !search.loading && search.results.length > 0}
-					<span class="text-xs text-ink-faint">{search.results.length} found</span>
-				{/if}
-			</div>
+			<!-- People first: a name search that leads with titles has answered the
+			     wrong question. -->
+			<PeopleRail people={search.people} onSelect={openPerson} />
 
 			{#if search.loading && search.results.length === 0}
 				<PosterGridSkeleton />
 			{:else if search.results.length > 0}
+				<div class="mb-3 flex items-baseline justify-between gap-3">
+					<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Search results</h2>
+					<span class="text-xs text-ink-faint">{search.results.length} found</span>
+				</div>
 				<PosterGrid>
 					{#each search.results as item, index (mediaKey(item))}
 						<DiscoverCard
@@ -183,16 +205,25 @@
 							{signedIn}
 							priority={index < EAGER_POSTERS}
 							saved={data.saved[mediaKey(item)] ?? null}
-							onSelect={() => (selected = item)}
+							onSelect={() => openTitle(item)}
 							onSubmit={withToast(`Added “${item.title}”`)}
 						/>
 					{/each}
 				</PosterGrid>
+			{:else if search.people.length > 0}
+				<!--
+					A name matched a person but no title, which is the whole point of
+					the row above — so "no results" would be both wrong and rude. This
+					says what happened and where to go next instead.
+				-->
+				<p class="text-sm text-ink-muted">
+					No titles are named “{search.query}”. Pick a face above to see what they have been in.
+				</p>
 			{:else}
 				<EmptyState
 					icon="search"
 					title={`No results for “${search.query}”`}
-					hint="Try a shorter title, or check the spelling."
+					hint="Try a name, a shorter title, or check the spelling."
 				/>
 			{/if}
 		{:else if allTrending.length > 0}
@@ -208,7 +239,7 @@
 						{signedIn}
 						priority={index < EAGER_POSTERS}
 						saved={data.saved[mediaKey(item)] ?? null}
-						onSelect={() => (selected = item)}
+						onSelect={() => openTitle(item)}
 						onSubmit={withToast(`Added “${item.title}”`)}
 					/>
 				{/each}
@@ -290,7 +321,15 @@
 		saved={selectedSaved}
 		{signedIn}
 		country={page.data.country}
-		onSelectTitle={(item) => (selected = item)}
+		onSelectTitle={openTitle}
 		onClose={() => (selected = null)}
+	/>
+{/if}
+
+{#if selectedPerson}
+	<PersonSheet
+		person={selectedPerson}
+		onSelect={openTitle}
+		onClose={() => (selectedPerson = null)}
 	/>
 {/if}
