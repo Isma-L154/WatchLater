@@ -28,17 +28,21 @@ const CACHE_CONTROL = 'public, max-age=300, s-maxage=3600, stale-while-revalidat
  *
  * Server-side proxy to TMDB multi-search. The browser calls this endpoint
  * instead of TMDB directly, which keeps the access token off the client.
+ *
+ * Titles and people come back as separate lists rather than one mixed array:
+ * they are different shapes, they are shown in different places, and merging
+ * them would push the decision of which is which into the browser.
  */
 export const GET: RequestHandler = async (event) => {
 	await enforceRateLimit(event);
 	const { url } = event;
 
 	const query = (url.searchParams.get('q') ?? '').trim().slice(0, MAX_QUERY_LENGTH);
-	if (!query) return json({ results: [] });
+	if (!query) return json({ results: [], people: [] });
 
 	try {
-		const results = await searchMulti(query);
-		return json({ results }, { headers: { 'cache-control': CACHE_CONTROL } });
+		const { titles, people } = await searchMulti(query);
+		return json({ results: titles, people }, { headers: { 'cache-control': CACHE_CONTROL } });
 	} catch (err) {
 		console.error('TMDB search failed:', err);
 		error(502, 'Failed to reach the movie database. Please try again.');

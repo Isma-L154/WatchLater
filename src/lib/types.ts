@@ -59,6 +59,17 @@ export interface PersonCredit extends MediaResult {
 	character: string | null;
 }
 
+/** A person as a search result: enough to recognise them by, and nothing more. */
+export interface PersonResult {
+	id: number;
+	name: string;
+	profilePath: string | null;
+	/** e.g. "Acting", "Directing" — what TMDB files them under. */
+	knownFor: string | null;
+	/** A couple of titles, so two actors with the same name are tellable apart. */
+	knownForTitles: string[];
+}
+
 /** A person and the handful of titles worth recognising them from. */
 export interface PersonFilmography {
 	id: number;

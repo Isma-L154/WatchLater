@@ -4,7 +4,9 @@ import {
 	FILMOGRAPHY_SIZE,
 	isSubstantial,
 	rankCredits,
-	type CreditCandidate
+	rankPeople,
+	type CreditCandidate,
+	type PersonCandidate
 } from './filmography';
 
 function credit(overrides: Partial<CreditCandidate> & { tmdbId: number }): CreditCandidate {
@@ -138,5 +140,45 @@ describe('creditKey', () => {
 
 	it('matches the same title however it was built', () => {
 		expect(creditKey(credit({ tmdbId: 42 }))).toBe(creditKey({ tmdbId: 42, mediaType: 'movie' }));
+	});
+});
+
+function person(overrides: Partial<PersonCandidate> & { id: number }): PersonCandidate {
+	return { profilePath: '/face.jpg', popularity: 1, ...overrides };
+}
+
+describe('rankPeople', () => {
+	it('leads with the one being looked for', () => {
+		const ranked = rankPeople(
+			[
+				person({ id: 1, popularity: 2 }),
+				person({ id: 2, popularity: 90 }),
+				person({ id: 3, popularity: 40 })
+			],
+			8
+		);
+		expect(ranked.map((p) => p.id)).toEqual([2, 3, 1]);
+	});
+
+	it('drops the faceless crew entries that crowd a name out', () => {
+		const ranked = rankPeople(
+			[person({ id: 1, profilePath: null, popularity: 99 }), person({ id: 2, popularity: 1 })],
+			8
+		);
+		expect(ranked.map((p) => p.id)).toEqual([2]);
+	});
+
+	it('lists a person once even when the index repeats them', () => {
+		const ranked = rankPeople([person({ id: 5 }), person({ id: 5 }), person({ id: 6 })], 8);
+		expect(ranked.map((p) => p.id)).toEqual([5, 6]);
+	});
+
+	it('keeps the strip short', () => {
+		const people = Array.from({ length: 30 }, (_, i) => person({ id: i + 1, popularity: i }));
+		expect(rankPeople(people, 8)).toHaveLength(8);
+	});
+
+	it('survives a query nobody matched', () => {
+		expect(rankPeople([], 8)).toEqual([]);
 	});
 });

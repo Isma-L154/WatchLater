@@ -15,14 +15,37 @@ import type { MediaType } from '$lib/types';
  */
 
 /**
- * How many titles the filmography panel shows.
+ * How many titles the inline panel in a detail sheet shows.
  *
- * Small on purpose. The panel opens inside a sheet that is already about
+ * Small on purpose. That panel opens inside a sheet that is already about
  * something else — it answers "what else have I seen them in" and then gets out
- * of the way. A full career belongs on a page of its own, not folded into a
- * detail view.
+ * of the way.
  */
 export const FILMOGRAPHY_SIZE = 5;
+
+/**
+ * How many titles the API returns, which is as far as a viewer can browse.
+ *
+ * Deliberately more than the panel shows. One cached response serves both the
+ * five-row aside inside a detail sheet and the full grid a person's own sheet
+ * opens with — splitting them would mean two edge-cache entries for the same
+ * career, and a viewer who taps a face in one place then searches for the same
+ * name paying for it twice.
+ *
+ * Not the whole career either: past twenty, credits are voice cameos, archive
+ * footage and documentaries about the person, which is where a filmography stops
+ * being a list of things anyone watched.
+ */
+export const PERSON_CREDITS_SIZE = 20;
+
+/**
+ * How many people a search shows.
+ *
+ * A strip above the titles, not a page of its own — a name search should still
+ * lead with what to watch. Anyone past the eighth match for a name is not who
+ * was being looked for.
+ */
+export const PEOPLE_RESULTS_SIZE = 8;
 
 /**
  * Identity for a credit, so a panel can be asked to leave one out.
@@ -97,5 +120,38 @@ export function rankCredits<T extends CreditCandidate>(credits: T[], limit: numb
 
 	return unique
 		.sort((a, b) => b.voteCount - a.voteCount || b.popularity - a.popularity)
+		.slice(0, Math.max(0, limit));
+}
+
+/** The fields person ranking reads, kept minimal for the same reason above. */
+export interface PersonCandidate {
+	id: number;
+	profilePath: string | null;
+	popularity: number;
+}
+
+/**
+ * Rank the people a search matched.
+ *
+ * By popularity, and here that is the right measure rather than the wrong one:
+ * a name is not a title, so there is nothing cumulative to sort by, and someone
+ * typing "hemsworth" means the Hemsworth currently in things — not the earliest
+ * TMDB id to carry the name.
+ *
+ * People with no photograph are dropped. The strip is a row of faces and a
+ * placeholder circle is not one; worse, TMDB's person index is full of one-line
+ * crew entries with no photo and no credits, and unfiltered they push the actual
+ * actor out of a strip this short.
+ */
+export function rankPeople<T extends PersonCandidate>(people: T[], limit: number): T[] {
+	const seen = new Set<number>();
+
+	return people
+		.filter((person) => {
+			if (!person.profilePath || seen.has(person.id)) return false;
+			seen.add(person.id);
+			return true;
+		})
+		.sort((a, b) => b.popularity - a.popularity)
 		.slice(0, Math.max(0, limit));
 }

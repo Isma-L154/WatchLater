@@ -1,4 +1,4 @@
-import type { MediaResult } from '$lib/types';
+import type { MediaResult, PersonResult } from '$lib/types';
 
 /** Wait after the last keystroke before hitting the network. */
 const DEBOUNCE_MS = 350;
@@ -10,6 +10,8 @@ const DEBOUNCE_MS = 350;
 export class MediaSearch {
 	query = $state('');
 	results = $state<MediaResult[]>([]);
+	/** People matching the same query, shown above the titles. */
+	people = $state<PersonResult[]>([]);
 	loading = $state(false);
 	error = $state<string | null>(null);
 
@@ -29,6 +31,7 @@ export class MediaSearch {
 		if (!query) {
 			this.#abort();
 			this.results = [];
+			this.people = [];
 			this.error = null;
 			this.loading = false;
 			return;
@@ -45,6 +48,7 @@ export class MediaSearch {
 		this.#abort();
 		this.query = '';
 		this.results = [];
+		this.people = [];
 		this.error = null;
 		this.loading = false;
 	};
@@ -65,13 +69,15 @@ export class MediaSearch {
 				signal: controller.signal
 			});
 			if (!response.ok) throw new Error('Search request failed');
-			const body = (await response.json()) as { results: MediaResult[] };
+			const body = (await response.json()) as { results: MediaResult[]; people: PersonResult[] };
 			this.results = body.results;
+			this.people = body.people ?? [];
 		} catch (err) {
 			// An abort is a superseded request, not a failure — leave the UI alone.
 			if (err instanceof DOMException && err.name === 'AbortError') return;
 			this.error = 'Something went wrong while searching. Please try again.';
 			this.results = [];
+			this.people = [];
 		} finally {
 			if (this.#inFlight === controller) {
 				this.#inFlight = undefined;

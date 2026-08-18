@@ -1,5 +1,12 @@
 import { env } from '$env/dynamic/private';
-import { FILMOGRAPHY_SIZE, rankCredits, type CreditCandidate } from '$lib/domain/filmography';
+import {
+	PEOPLE_RESULTS_SIZE,
+	PERSON_CREDITS_SIZE,
+	rankCredits,
+	rankPeople,
+	type CreditCandidate,
+	type PersonCandidate
+} from '$lib/domain/filmography';
 import type {
 	Episode,
 	MediaDetails,
@@ -7,6 +14,7 @@ import type {
 	MediaType,
 	PersonCredit,
 	PersonFilmography,
+	PersonResult,
 	SeasonEpisodes,
 	UpcomingSeason,
 	WatchOptions,
@@ -92,24 +100,85 @@ function normalize(raw: TmdbRawResult, mediaType: MediaType): MediaResult {
 	};
 }
 
-/**
- * Search movies and TV shows in a single request via TMDB multi-search.
- * People and any unknown media types are filtered out.
- */
-export async function searchMulti(query: string): Promise<MediaResult[]> {
-	const data = await tmdbFetch<TmdbPaginatedResponse>('/search/multi', {
-		query,
-		include_adult: 'false',
-		language: 'en-US',
-		page: '1'
-	});
+/** Person entries in a multi-search, which carry their best-known titles inline. */
+interface TmdbPersonSearchRaw {
+	id: number;
+	media_type?: string;
+	name?: string;
+	profile_path?: string | null;
+	known_for_department?: string;
+	popularity?: number;
+	known_for?: TmdbRawResult[];
+}
 
-	return data.results
+/** How many titles a person's search entry names to tell them apart by. */
+const KNOWN_FOR_TITLES = 2;
+
+/** Both halves of what a search can match. */
+export interface SearchResults {
+	titles: MediaResult[];
+	people: PersonResult[];
+}
+
+/**
+ * Search movies, TV shows and people in a single request via TMDB multi-search.
+ *
+ * People used to be discarded here, which made the app searchable only by title
+ * — the one thing you cannot do is look up the actor whose name you remember
+ * when the film's has gone. They come back from the same response as the titles,
+ * so answering both halves of the question costs no extra request.
+ *
+ * `known_for` rides along on each person entry, which is what lets the strip say
+ * *which* Chris Evans this is without a second lookup per face.
+ */
+export async function searchMulti(query: string): Promise<SearchResults> {
+	const data = await tmdbFetch<TmdbPaginatedResponse & { results: TmdbPersonSearchRaw[] }>(
+		'/search/multi',
+		{
+			query,
+			include_adult: 'false',
+			language: 'en-US',
+			page: '1'
+		}
+	);
+
+	const raw = data.results as (TmdbRawResult & TmdbPersonSearchRaw)[];
+
+	const titles = raw
 		.filter(
-			(raw): raw is TmdbRawResult & { media_type: MediaType } =>
-				raw.media_type === 'movie' || raw.media_type === 'tv'
+			(item): item is TmdbRawResult & { media_type: MediaType } =>
+				item.media_type === 'movie' || item.media_type === 'tv'
 		)
-		.map((raw) => normalize(raw, raw.media_type));
+		.map((item) => normalize(item, item.media_type));
+
+	const people = raw
+		.filter((item) => item.media_type === 'person')
+		.map((item): PersonResult & PersonCandidate => ({
+			id: item.id,
+			name: item.name?.trim() || 'Unknown',
+			profilePath: item.profile_path ?? null,
+			knownFor: item.known_for_department?.trim() || null,
+			knownForTitles: (item.known_for ?? [])
+				.map((credit) => credit.title ?? credit.name ?? '')
+				.filter(Boolean)
+				.slice(0, KNOWN_FOR_TITLES),
+			popularity: item.popularity ?? 0
+		}));
+
+	return {
+		titles,
+		// The ranking score is dropped rather than sent on: the order is the
+		// answer, and the number behind it is not the browser's business.
+		people: rankPeople(people, PEOPLE_RESULTS_SIZE).map(
+			({ id, name, profilePath, knownFor, knownForTitles }) => ({
+				id,
+				name,
+				profilePath,
+				knownFor,
+				knownForTitles
+			})
+		)
+	};
 }
 
 /** Extra fields returned by the single-title details endpoint. */
@@ -473,17 +542,6 @@ interface TmdbPersonRaw {
 }
 
 /**
- * One more than the panel shows.
- *
- * The sheet's own title is a credit like any other and always ranks at or near
- * the top — it is why the person's face is on the screen at all. The panel drops
- * it, so the spare keeps the list a full five once it has. The filtering is not
- * done here on purpose: which title is open is per-viewer, and this response is
- * cached at the edge for everyone.
- */
-const FILMOGRAPHY_FETCH_SIZE = FILMOGRAPHY_SIZE + 1;
-
-/**
  * A career changes about as often as a birthday, so this caches for a day at the
  * edge like recommendations do. Keyed by person id and identical for everyone.
  */
@@ -527,7 +585,7 @@ export async function getPersonFilmography(personId: number): Promise<PersonFilm
 		// Ranking fields are dropped here rather than carried to the client: the
 		// order is the answer, and the numbers behind it are not the browser's
 		// business.
-		credits: rankCredits(candidates, FILMOGRAPHY_FETCH_SIZE).map(
+		credits: rankCredits(candidates, PERSON_CREDITS_SIZE).map(
 			({
 				tmdbId,
 				mediaType,
