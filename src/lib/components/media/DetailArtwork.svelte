@@ -21,6 +21,32 @@
 
 	let showTrailer = $state(false);
 
+	/**
+	 * The embed's parameters, and the reason each one is here.
+	 *
+	 * Playback quality is deliberately absent. YouTube stopped honouring `vq`
+	 * years ago and `setPlaybackQuality` is documented as a suggestion the player
+	 * is free to ignore; it picks a resolution from bandwidth and viewport, and
+	 * nothing an embedder passes overrides that. The viewer can still choose one
+	 * by hand — the gear menu is YouTube's own and is already there.
+	 *
+	 * - `playsinline` keeps the trailer inside the sheet on iOS, which otherwise
+	 *   throws every embed into the system fullscreen player and drops the viewer
+	 *   out of the sheet they were reading.
+	 * - `controls` is the default, stated so a future edit has to mean it.
+	 * - `cc_load_policy` turns captions on where the video has them.
+	 * - `modestbranding` and `rel` keep the end of a trailer from turning into a
+	 *   grid of somebody else's uploads.
+	 */
+	const PLAYER_PARAMS = new URLSearchParams({
+		autoplay: '1',
+		playsinline: '1',
+		controls: '1',
+		cc_load_policy: '1',
+		modestbranding: '1',
+		rel: '0'
+	}).toString();
+
 	// A new title means a new sheet, but the same sheet can refetch when the
 	// tracked season changes; the trailer should not survive that.
 	$effect(() => {
@@ -36,8 +62,8 @@
 		<iframe
 			class="h-full w-full"
 			title={`${details.title} trailer`}
-			src={`https://www.youtube-nocookie.com/embed/${details.trailerKey}?autoplay=1&rel=0`}
-			allow="autoplay; encrypted-media; fullscreen"
+			src={`https://www.youtube-nocookie.com/embed/${details.trailerKey}?${PLAYER_PARAMS}`}
+			allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
 			allowfullscreen
 		></iframe>
 	{:else}
