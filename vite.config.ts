@@ -68,10 +68,20 @@ export default defineConfig({
 					browser: {
 						enabled: true,
 						provider: playwright(),
+						// Wide enough to be past the `sm` breakpoint. Several components
+						// deliberately behave differently below it — `ScrollRail` hides
+						// its arrows on a phone, where dragging is the gesture — so a
+						// narrow default would test the mobile variant while the test
+						// name claimed otherwise.
+						viewport: { width: 1280, height: 800 },
 						instances: [{ browser: 'chromium', headless: true }]
 					},
 					include: ['src/**/*.svelte.{test,spec}.{js,ts}'],
-					exclude: ['src/lib/server/**']
+					exclude: ['src/lib/server/**'],
+					// Components here are styled entirely with utility classes, so
+					// without the stylesheet they mount as unstyled boxes and any
+					// layout-dependent assertion is meaningless.
+					setupFiles: ['./vitest-setup-client.ts']
 				}
 			},
 
