@@ -9,6 +9,10 @@
 		<!-- Poster and profile images all come from this one host; warming the
 		     connection removes a DNS + TLS round-trip from the first grid render. -->
 		<link rel="preconnect" href="https://image.tmdb.org" crossorigin />
+		<!-- Makes the app installable to the home screen. This is a watchlist that
+		     gets opened on a phone, on the sofa; a browser tab is the wrong shape
+		     for that. The icons it points at were already here, unused. -->
+		<link rel="manifest" href="/manifest.webmanifest" />
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

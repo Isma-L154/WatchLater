@@ -1,0 +1,33 @@
+{
+	"name": "Nextsode",
+	"short_name": "Nextsode",
+	"description": "A free watchlist for films and TV. Track series down to the episode you are on, see where to watch anything, and never mark a season watched before it has aired.",
+	"id": "/",
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait-primary",
+	"background_color": "#07070e",
+	"theme_color": "#07070e",
+	"categories": ["entertainment", "lifestyle", "utilities"],
+	"icons": [
+		{
+			"src": "/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "any"
+		},
+		{
+			"src": "/icon-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}
