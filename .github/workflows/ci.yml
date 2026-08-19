@@ -26,11 +26,12 @@ jobs:
       - name: Lint (Prettier + ESLint)
         run: npm run lint
 
-      - name: Sync SvelteKit
-        run: npx svelte-kit sync
-
+      # The same script a developer runs. CI used to call svelte-check directly
+      # because `npm run check` was gated on `wrangler types --check`, which
+      # could not pass on a machine that had already built; that divergence is
+      # why the broken script went unnoticed for so long.
       - name: Type-check (svelte-check)
-        run: npx svelte-check --tsconfig ./tsconfig.json
+        run: npm run check
 
       - name: Unit tests (Vitest)
         run: npm run test:unit -- --run --project server
@@ -60,10 +61,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # `npm run build` also runs `wrangler types --check`, which needs
-      # credentials and is a local development aid. CI only needs the artifact.
       - name: Build
-        run: npx vite build
+        run: npm run build
 
       - name: Deploy
         uses: cloudflare/wrangler-action@v3

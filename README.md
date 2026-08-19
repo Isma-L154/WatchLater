@@ -72,6 +72,13 @@ OAuth client ID for a Web application and add one redirect URI per environment â
 Other scripts: `npm run lint`, `npm run check`, `npm run test:unit`,
 `npm run test:e2e`.
 
+`npm run gen` regenerates `worker-configuration.d.ts` from the bindings in
+`wrangler.jsonc`. Run it when you add or change a binding, and commit the
+result. Run it on a clean tree: `wrangler types` adds an extra `GlobalProps`
+interface pointing at the built worker when `.svelte-kit/cloudflare/_worker.js`
+happens to exist, so regenerating after a build produces a file that differs
+from the one CI generates.
+
 ## Deployment
 
 Pushes to `main` deploy to Cloudflare automatically once CI passes. That needs
@@ -92,9 +99,7 @@ npx wrangler secret put GOOGLE_CLIENT_ID
 npx wrangler secret put GOOGLE_CLIENT_SECRET
 ```
 
-To deploy by hand: `npx vite build && npx wrangler deploy`. Note `vite build`
-rather than `npm run build`, which also runs `wrangler types --check` and needs
-credentials.
+To deploy by hand: `npm run build && npx wrangler deploy`.
 
 ## Security
 
