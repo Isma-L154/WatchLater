@@ -75,6 +75,24 @@ body {
 	min-height: 100dvh;
 }
 
+html {
+	/*
+	 * Reserve the scrollbar's width whether or not a scrollbar is showing.
+	 *
+	 * Every sheet locks the background by setting `overflow: hidden` on the
+	 * body. On a browser that gives the scrollbar its own column — Chrome on
+	 * Windows by default, and Firefox — that hands ~15px back to the viewport
+	 * the moment a sheet opens, and the whole page behind the overlay jumps
+	 * sideways. Reserving the gutter permanently means locking scroll changes
+	 * nothing.
+	 *
+	 * Deliberately not chased with padding on the body instead: that has to be
+	 * measured, applied and undone in JavaScript, and gets it wrong on any
+	 * browser with overlay scrollbars, where the correction should be zero.
+	 */
+	scrollbar-gutter: stable;
+}
+
 body {
 	@apply bg-canvas font-sans text-ink antialiased;
 	/* Cinematic wash: three wide, low-opacity glows anchored off-screen. Fixed

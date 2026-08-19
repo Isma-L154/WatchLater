@@ -17,6 +17,20 @@ export function backdropUrl(path: string | null, size: 'w780' | 'w1280' = 'w1280
 	return path ? `${TMDB_IMAGE_BASE_URL}/${size}${path}` : null;
 }
 
+/**
+ * Both backdrop widths as a `srcset`, so the browser picks by display.
+ *
+ * The sheet is `max-w-2xl` — 672 CSS px. On a standard-density desktop that
+ * makes `w1280` roughly twice the pixels it paints, which measured as 95kB of
+ * waste per sheet opened. A phone at 3x genuinely wants ~1170px, so neither
+ * width is correct on its own and picking one in advance gets it wrong for
+ * half the visitors.
+ */
+export function backdropSrcset(path: string | null): string | null {
+	if (!path) return null;
+	return `${backdropUrl(path, 'w780')} 780w, ${backdropUrl(path, 'w1280')} 1280w`;
+}
+
 /** Build a cast member profile photo URL. */
 export function profileUrl(path: string | null): string | null {
 	return path ? `${TMDB_IMAGE_BASE_URL}/w185${path}` : null;
