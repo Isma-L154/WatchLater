@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { backdropUrl, formatRuntime, posterUrl, profileUrl, releaseYear } from './tmdb-image';
+import {
+	backdropSrcset,
+	backdropUrl,
+	formatRuntime,
+	posterUrl,
+	profileUrl,
+	releaseYear
+} from './tmdb-image';
 
 describe('posterUrl', () => {
 	it('builds a URL with the default size', () => {
@@ -22,6 +29,27 @@ describe('backdropUrl', () => {
 
 	it('returns null when there is no path', () => {
 		expect(backdropUrl(null)).toBeNull();
+	});
+});
+
+describe('backdropSrcset', () => {
+	it('offers both widths with their real pixel sizes', () => {
+		expect(backdropSrcset('/bg.jpg')).toBe(
+			'https://image.tmdb.org/t/p/w780/bg.jpg 780w, https://image.tmdb.org/t/p/w1280/bg.jpg 1280w'
+		);
+	});
+
+	it('describes each candidate by width, not by density', () => {
+		// `w` descriptors are what lets `sizes` do its job; `2x` would tie the
+		// choice to the display and ignore how wide the sheet actually renders.
+		const descriptors = backdropSrcset('/bg.jpg')!
+			.split(', ')
+			.map((c) => c.split(' ')[1]);
+		expect(descriptors).toEqual(['780w', '1280w']);
+	});
+
+	it('returns null when there is no path', () => {
+		expect(backdropSrcset(null)).toBeNull();
 	});
 });
 

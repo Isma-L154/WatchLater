@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Icon from '$lib/components/ui/Icon.svelte';
-	import { backdropUrl } from '$lib/format/tmdb-image';
+	import { backdropSrcset, backdropUrl } from '$lib/format/tmdb-image';
 	import type { MediaDetails } from '$lib/types';
 
 	/**
@@ -55,6 +55,7 @@
 	});
 
 	const backdrop = $derived(backdropUrl(details.backdropPath));
+	const backdropSet = $derived(backdropSrcset(details.backdropPath));
 </script>
 
 <div class="relative aspect-video w-full overflow-hidden bg-surface-hi">
@@ -68,7 +69,19 @@
 		></iframe>
 	{:else}
 		{#if backdrop}
-			<img src={backdrop} alt="" class="h-full w-full object-cover" />
+			<!--
+				`sizes` describes the rendered width, not the file: the sheet is capped
+				at 672px on a pointer device and spans the viewport on a phone. The
+				browser multiplies that by the device pixel ratio itself, which is the
+				part a fixed width can never get right for both.
+			-->
+			<img
+				src={backdrop}
+				srcset={backdropSet}
+				sizes="(min-width: 640px) 672px, 100vw"
+				alt=""
+				class="h-full w-full object-cover"
+			/>
 		{/if}
 		<div class="absolute inset-0 bg-gradient-to-t from-surface via-surface/45 to-transparent"></div>
 		{#if details.trailerKey}
