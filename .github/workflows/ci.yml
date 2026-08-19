@@ -33,8 +33,13 @@ jobs:
       - name: Type-check (svelte-check)
         run: npm run check
 
+      # The component project drives a real Chromium, so the binary has to be
+      # here before the tests run. Only chromium — the suite pins one browser.
+      - name: Install Chromium for component tests
+        run: npx playwright install --with-deps chromium
+
       - name: Unit tests (Vitest)
-        run: npm run test:unit -- --run --project server
+        run: npm run test:unit -- --run
 
   deploy:
     name: Deploy to Cloudflare
