@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<style>
+			/*
+				The repository banner.
+
+				Same palette, typeface and film mark as the app, so the two never drift
+				apart. Every shape here is original: the posters on the wall are
+				archetypes — a spaceship, a crown, a figure in a hat — because "films
+				and TV" reads fine from those, and somebody else's characters on a
+				public repo is a legal problem rather than a design one.
+
+				Rendered by `npm run brand`.
+			*/
+			@font-face {
+				font-family: 'Outfit';
+				src: url('__OUTFIT__') format('woff2');
+				font-weight: 100 900;
+			}
+			@font-face {
+				font-family: 'Work Sans';
+				src: url('__WORK_SANS__') format('woff2');
+				font-weight: 100 900;
+			}
+
+			:root {
+				--canvas: #07070e;
+				--brand: #6366f1;
+				--brand-hi: #818cf8;
+				--ink: #e8e8f0;
+				--ink-muted: #9a9ab0;
+			}
+
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+			body {
+				background: var(--canvas);
+			}
+
+			#banner {
+				position: relative;
+				width: 1280px;
+				height: 640px;
+				overflow: hidden;
+				background:
+					radial-gradient(60rem 40rem at 50% -10%, rgba(99, 102, 241, 0.18), transparent 62%),
+					radial-gradient(40rem 30rem at 100% 10%, rgba(56, 189, 248, 0.08), transparent 58%),
+					radial-gradient(45rem 35rem at 0% 30%, rgba(217, 70, 239, 0.07), transparent 58%),
+					var(--canvas);
+				font-family: 'Work Sans', system-ui, sans-serif;
+			}
+
+			/* ---- the poster wall behind everything ------------------------------ */
+			.wall {
+				position: absolute;
+				inset: -30px 0 auto 0;
+				height: 430px;
+				display: grid;
+				grid-template-columns: repeat(18, 1fr);
+				gap: 10px;
+				padding: 0 20px;
+				/* Fades outward so the wall reads as depth, not as a chart. */
+				-webkit-mask-image: radial-gradient(
+					120% 100% at 50% 20%,
+					#000 25%,
+					rgba(0, 0, 0, 0.55) 55%,
+					transparent 82%
+				);
+			}
+			.poster {
+				aspect-ratio: 2 / 3;
+				border-radius: 5px;
+				background: #12121c;
+				box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				opacity: 0.62;
+			}
+			.poster svg {
+				width: 38%;
+				height: 38%;
+				opacity: 0.45;
+			}
+			/* Rows are staggered, so the wall is not a perfect grid. */
+			.wall > .poster:nth-child(n + 19) {
+				margin-top: 8px;
+			}
+			.wall > .poster:nth-child(n + 37) {
+				margin-top: 16px;
+			}
+
+			/* Keeps the copy legible wherever the wall happens to be bright. */
+			.scrim {
+				position: absolute;
+				inset: 0 auto 0 0;
+				width: 620px;
+				background: linear-gradient(
+					to right,
+					var(--canvas) 0%,
+					rgba(7, 7, 14, 0.94) 42%,
+					rgba(7, 7, 14, 0.62) 72%,
+					transparent 100%
+				);
+			}
+			/* Floor: grounds the scene and kills the dead black at the bottom. */
+			.floor {
+				position: absolute;
+				inset: auto 0 0 0;
+				height: 240px;
+				background: linear-gradient(
+					to bottom,
+					transparent,
+					rgba(99, 102, 241, 0.06) 55%,
+					rgba(7, 7, 14, 0.9)
+				);
+			}
+
+			/* ---- the television ------------------------------------------------- */
+			.tv {
+				position: absolute;
+				left: 50%;
+				top: 132px;
+				transform: translateX(-50%);
+				width: 404px;
+				height: 236px;
+				border-radius: 18px;
+				padding: 12px;
+				background: #0d0d16;
+				box-shadow:
+					inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+					0 0 90px 30px rgba(99, 102, 241, 0.28),
+					0 0 200px 80px rgba(99, 102, 241, 0.12);
+			}
+			.screen {
+				width: 100%;
+				height: 100%;
+				border-radius: 9px;
+				background:
+					radial-gradient(80% 120% at 50% 110%, rgba(255, 255, 255, 0.5), transparent 60%),
+					linear-gradient(150deg, #818cf8, #6366f1 45%, #38bdf8);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+			}
+			.screen svg {
+				width: 74px;
+				height: 74px;
+				opacity: 0.9;
+			}
+			/* The stand, so the set is sitting on something. */
+			.tv::after {
+				content: '';
+				position: absolute;
+				left: 50%;
+				bottom: -16px;
+				transform: translateX(-50%);
+				width: 120px;
+				height: 16px;
+				border-radius: 0 0 8px 8px;
+				background: #0d0d16;
+				box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+			}
+
+			/* ---- light thrown from the screen towards the viewer ---------------- */
+			.spill {
+				position: absolute;
+				left: 50%;
+				top: 372px;
+				transform: translateX(-50%);
+				width: 940px;
+				height: 268px;
+				background: linear-gradient(to bottom, rgba(129, 140, 248, 0.16), transparent 72%);
+				clip-path: polygon(36% 0, 64% 0, 100% 100%, 0 100%);
+			}
+
+			/* ---- the couch, and whoever is on it -------------------------------- */
+			.viewer {
+				position: absolute;
+				left: 50%;
+				bottom: 0;
+				transform: translateX(-50%);
+				width: 1120px;
+				height: 260px;
+			}
+			/* Head and shoulders, seen from behind and lit only from the front. */
+			.head {
+				position: absolute;
+				left: 50%;
+				bottom: 158px;
+				transform: translateX(-50%);
+				width: 82px;
+				height: 82px;
+				border-radius: 50%;
+				background: #030308;
+				/* Rim light: the screen is the only thing lighting this room. */
+				box-shadow:
+					0 -3px 0 2px rgba(129, 140, 248, 0.35),
+					-26px -4px 0 -8px rgba(129, 140, 248, 0.18),
+					26px -4px 0 -8px rgba(129, 140, 248, 0.18);
+			}
+			.shoulders {
+				position: absolute;
+				left: 50%;
+				bottom: 78px;
+				transform: translateX(-50%);
+				width: 268px;
+				height: 96px;
+				border-radius: 134px 134px 0 0;
+				background: #030308;
+				box-shadow: 0 -3px 0 1px rgba(129, 140, 248, 0.22);
+			}
+			.couch {
+				position: absolute;
+				left: 0;
+				bottom: 0;
+				width: 100%;
+				height: 132px;
+				border-radius: 30px 30px 0 0;
+				/* Lighter than the person in front of it, which is what separates them. */
+				background: linear-gradient(to bottom, #16162a, #0d0d18 70%);
+				box-shadow:
+					inset 0 2px 0 rgba(129, 140, 248, 0.34),
+					inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+			}
+			/* Cushion seams: the cheapest thing that makes a rounded rectangle read
+			   as a sofa rather than a worktop. */
+			.seam {
+				position: absolute;
+				top: 14px;
+				bottom: 0;
+				width: 2px;
+				background: linear-gradient(to bottom, rgba(129, 140, 248, 0.22), transparent 70%);
+			}
+			.seam.l {
+				left: 33%;
+			}
+			.seam.r {
+				right: 33%;
+			}
+
+			/* Arms, so the couch is a couch and not a bar. */
+			.couch::before,
+			.couch::after {
+				content: '';
+				position: absolute;
+				bottom: 0;
+				width: 92px;
+				height: 104px;
+				border-radius: 30px 30px 0 0;
+				background: linear-gradient(to bottom, #1b1b33, #101020 70%);
+				box-shadow: inset 0 2px 0 rgba(129, 140, 248, 0.26);
+			}
+			.couch::before {
+				left: -46px;
+			}
+			.couch::after {
+				right: -46px;
+			}
+
+			/* ---- the mark ------------------------------------------------------- */
+			.brand {
+				position: absolute;
+				left: 56px;
+				top: 48px;
+				display: flex;
+				align-items: center;
+				gap: 14px;
+			}
+			.badge {
+				width: 54px;
+				height: 54px;
+				border-radius: 15px;
+				background: var(--brand);
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				box-shadow: 0 10px 30px rgba(99, 102, 241, 0.45);
+			}
+			.badge svg {
+				width: 30px;
+				height: 30px;
+			}
+			.wordmark {
+				font-family: 'Outfit', system-ui, sans-serif;
+				font-weight: 800;
+				font-size: 40px;
+				letter-spacing: -0.02em;
+				color: var(--ink);
+			}
+			.wordmark span {
+				color: var(--brand-hi);
+			}
+
+			.tagline {
+				position: absolute;
+				left: 56px;
+				top: 122px;
+				font-family: 'Outfit', system-ui, sans-serif;
+				font-weight: 700;
+				font-size: 30px;
+				line-height: 1.22;
+				letter-spacing: -0.015em;
+				color: var(--ink);
+				max-width: 400px;
+			}
+			.sub {
+				position: absolute;
+				left: 56px;
+				top: 214px;
+				font-size: 17px;
+				line-height: 1.5;
+				color: var(--ink-muted);
+				max-width: 360px;
+			}
+
+			/* The one detail that says what this app does that others do not. */
+			.chip {
+				position: absolute;
+				left: 56px;
+				top: 300px;
+				display: inline-flex;
+				align-items: center;
+				gap: 10px;
+				padding: 9px 16px;
+				border-radius: 999px;
+				background: rgba(99, 102, 241, 0.14);
+				box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.3);
+				color: var(--brand-hi);
+				font-size: 15px;
+				font-weight: 600;
+			}
+			.dots {
+				display: flex;
+				gap: 5px;
+			}
+			.dot {
+				width: 7px;
+				height: 7px;
+				border-radius: 50%;
+				background: var(--brand-hi);
+			}
+			.dot.empty {
+				background: rgba(129, 140, 248, 0.25);
+			}
+		</style>
+	</head>
+	<body>
+		<div id="banner">
+			<div class="wall" id="wall"></div>
+			<div class="floor"></div>
+			<div class="scrim"></div>
+
+			<div class="spill"></div>
+
+			<div class="tv">
+				<div class="screen">
+					<svg
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="#0b0b14"
+						stroke-width="1.8"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path
+							d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"
+						/>
+					</svg>
+				</div>
+			</div>
+
+			<div class="viewer">
+				<div class="head"></div>
+				<div class="shoulders"></div>
+				<div class="couch"><span class="seam l"></span><span class="seam r"></span></div>
+			</div>
+
+			<div class="brand">
+				<div class="badge">
+					<svg
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="#fff"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path
+							d="M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM7 3v18M17 3v18M3 7.5h4M3 12h18M3 16.5h4M17 7.5h4M17 16.5h4"
+						/>
+					</svg>
+				</div>
+				<div class="wordmark">Next<span>sode</span></div>
+			</div>
+
+			<p class="tagline">Never lose your place in a series.</p>
+			<p class="sub">
+				Track films and TV down to the episode you are on, and see where to watch anything.
+			</p>
+
+			<div class="chip">
+				Next: S2 E5
+				<span class="dots">
+					<span class="dot"></span><span class="dot"></span><span class="dot"></span>
+					<span class="dot empty"></span><span class="dot empty"></span>
+				</span>
+			</div>
+		</div>
+
+		<script>
+			/*
+				Poster archetypes, drawn as simple marks. Named characters are
+				deliberately absent — these read as "films and TV" without being
+				anybody's property.
+			*/
+			const MARKS = [
+				'M12 2l2.6 6.2L21 9l-4.8 4.3L17.6 20 12 16.8 6.4 20l1.4-6.7L3 9l6.4-.8L12 2Z', // star
+				'M12 2c3 3 4.5 6 4.5 9a4.5 4.5 0 0 1-9 0c0-3 1.5-6 4.5-9ZM7 20h10', // rocket-ish flame
+				'M3 8l4 3 5-6 5 6 4-3-2 11H5L3 8Z', // crown
+				'M12 3a5 5 0 0 1 5 5c0 3-5 4-5 4s-5-1-5-4a5 5 0 0 1 5-5ZM6 21h12', // figure in a hat
+				'M2 12h20M12 2v20M5 5l14 14M19 5L5 19', // starburst
+				'M4 6h16v12H4zM8 18v3M16 18v3M2 21h20', // screen
+				'M12 21s-8-4.6-8-10a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 11c0 5.4-8 10-8 10Z', // heart
+				'M5 3v18l14-9L5 3Z', // play
+				'M6 4h12v16l-6-4-6 4V4Z', // bookmark
+				'M12 3l9 6-9 6-9-6 9-6ZM3 15l9 6 9-6' // layers
+			];
+
+			const wall = document.getElementById('wall');
+			// Three rows of eighteen; the mask hides whatever falls off the edges.
+			for (let i = 0; i < 54; i++) {
+				const cell = document.createElement('div');
+				cell.className = 'poster';
+				// Fixed sequence rather than random, so the banner regenerates identically.
+				const hue = [232, 262, 199, 292, 218][i % 5];
+				cell.style.background = `linear-gradient(160deg, hsl(${hue} 45% 14%), #0e0e18)`;
+				cell.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="hsl(${hue} 70% 78%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${MARKS[i % MARKS.length]}"/></svg>`;
+				wall.append(cell);
+			}
+		</script>
+	</body>
+</html>
