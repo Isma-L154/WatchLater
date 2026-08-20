@@ -20,6 +20,26 @@ test('shows Discover and switches to results when searching', async ({ page }) =
 	await expect(page.getByRole('heading', { name: 'Search results' })).toBeVisible();
 });
 
+test('the logo puts Discover back to a clean slate', async ({ page }) => {
+	await page.goto('/');
+
+	const search = page.getByPlaceholder(/search movies and tv shows/i);
+	await search.fill('Oppenheimer');
+	await expect(page.getByRole('heading', { name: 'Search results' })).toBeVisible();
+
+	/**
+	 * The regression this guards: on Discover the logo's href is the URL already
+	 * open, so nothing navigates and nothing remounts. Without an explicit reset
+	 * the search someone typed stays sitting under the logo they pressed to
+	 * leave it.
+	 */
+	await page.locator('header a[href$="/"]').first().click();
+
+	await expect(search).toHaveValue('');
+	await expect(page.getByRole('heading', { name: 'Trending this week' })).toBeVisible();
+	await expect(page.getByRole('heading', { name: 'Search results' })).toBeHidden();
+});
+
 test('navigates between Discover and My List', async ({ page }) => {
 	await page.goto('/');
 
