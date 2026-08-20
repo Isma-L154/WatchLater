@@ -3,16 +3,24 @@
 	import { enhance } from '$app/forms';
 	import Icon from '$lib/components/ui/Icon.svelte';
 	import Seo from '$lib/components/Seo.svelte';
+	import { pageSchema } from '$lib/format/seo';
 	import Prose from '$lib/components/ui/Prose.svelte';
 
 	const signedIn = $derived(Boolean(page.data.user));
+
+	// Declared once: the meta tags and the structured data have to agree, and
+	// two copies of a sentence are two chances for them to drift apart.
+	const TITLE = 'Privacy — Nextsode';
+	const DESCRIPTION =
+		'What Nextsode stores, who processes it, and how to delete everything. No tracking, no advertising, no profiling.';
 </script>
 
 <Seo
-	title="Privacy — Nextsode"
-	description="What Nextsode stores, who processes it, and how to delete everything. No tracking, no advertising, no profiling."
+	title={TITLE}
+	description={DESCRIPTION}
 	origin={page.data.origin}
 	path="/privacy"
+	schema={pageSchema(page.data.origin, '/privacy', TITLE, DESCRIPTION)}
 />
 
 <Prose title="Privacy" updated="15 August 2026">
