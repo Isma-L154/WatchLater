@@ -17,6 +17,7 @@
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { MediaSearch } from '$lib/stores/search.svelte';
+	import { homeReset } from '$lib/stores/home-reset.svelte';
 	import { TrendingFeed } from '$lib/stores/trending.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
 	import { dedupeByKey, mediaKey } from '$lib/domain/media';
@@ -93,6 +94,26 @@
 		selectedPerson = null;
 		selected = item;
 	}
+
+	/**
+	 * The header's logo, asking for a clean slate.
+	 *
+	 * On Discover the logo's link goes to the URL already open, so nothing
+	 * navigates and this component is never remounted — the search someone typed
+	 * would otherwise still be sitting there under a logo they pressed to leave
+	 * it. Scroll is left alone: a same-URL click already resets it.
+	 *
+	 * Trending pagination is deliberately not reset. Pressing the logo to get
+	 * home should not throw away pages somebody asked for by hand.
+	 */
+	$effect(() => {
+		void homeReset.requested;
+		untrack(() => {
+			search.clear();
+			selected = null;
+			selectedPerson = null;
+		});
+	});
 
 	const selectedSaved = $derived(selected ? (data.saved[mediaKey(selected)] ?? null) : null);
 

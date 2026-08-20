@@ -5,6 +5,7 @@
 	import Icon, { type IconName } from './Icon.svelte';
 	import AccountChip from '$lib/components/auth/AccountChip.svelte';
 	import Footer from './Footer.svelte';
+	import { homeReset } from '$lib/stores/home-reset.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import type { SessionUser } from '$lib/types';
 
@@ -74,8 +75,15 @@
 		<div
 			class="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4 sm:h-16 sm:gap-6 sm:px-6"
 		>
+			<!--
+				Stays a real link — middle-click, "open in new tab" and a crawler all
+				need the href. The handler is what makes it work in the one case the
+				href cannot: on Discover the target is the URL you are already on, so
+				nothing navigates and the page keeps whatever was typed into it.
+			-->
 			<a
 				href={resolve('/')}
+				onclick={() => homeReset.request()}
 				class="flex flex-shrink-0 items-center gap-2 transition-opacity duration-200 hover:opacity-80"
 			>
 				<span
