@@ -19,10 +19,12 @@
 	import { siteSchema } from '$lib/format/seo';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { homeReset } from '$lib/stores/home-reset.svelte';
+	import { JUST_SAVED, optimistic, pendingSaves } from '$lib/stores/pending-saves.svelte';
 	import { TrendingFeed } from '$lib/stores/trending.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { withToast } from '$lib/forms/feedback';
 	import { dedupeByKey, mediaKey } from '$lib/domain/media';
-	import type { MediaType, PersonResult } from '$lib/types';
+	import type { MediaResult, MediaType, PersonResult } from '$lib/types';
 	import type { PageData } from './$types';
 
 	/**
@@ -116,7 +118,16 @@
 		});
 	});
 
-	const selectedSaved = $derived(selected ? (data.saved[mediaKey(selected)] ?? null) : null);
+	/**
+	 * The loader's saved index with any in-flight save or removal laid over it.
+	 *
+	 * Every card and the detail sheet read from this one value, so a title that
+	 * appears in a rail and in the grid flips in both places from the single tap
+	 * that was actually made.
+	 */
+	const savedIndex = $derived(pendingSaves.overlay(data.saved));
+
+	const selectedSaved = $derived(selected ? (savedIndex[mediaKey(selected)] ?? null) : null);
 
 	/**
 	 * Surface the outcome of the OAuth round-trip, which comes back as a query
@@ -133,16 +144,15 @@
 	});
 
 	/**
-	 * Progressive-enhancement helper: after the action completes it refreshes the
-	 * page data and shows a toast reflecting the outcome.
+	 * Saving a title, shown before the server has agreed to it.
+	 *
+	 * The toast still waits for the response. The card is the optimistic part —
+	 * it is reversible and it is what the tap was aimed at — but a toast is a
+	 * statement of fact, and announcing a save that then failed would be worse
+	 * than announcing it a moment late.
 	 */
-	function withToast(message: string, type: 'success' | 'info' = 'success'): SubmitFunction {
-		return () =>
-			async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toasts.add(message, type);
-				else if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
-			};
+	function addOptimistically(item: MediaResult): SubmitFunction {
+		return optimistic(mediaKey(item), JUST_SAVED, withToast(`Added “${item.title}”`));
 	}
 </script>
 
@@ -190,9 +200,9 @@
 					{rail}
 					{signedIn}
 					priority={index === 0}
-					saved={data.saved}
+					saved={savedIndex}
 					onSelect={openTitle}
-					onAdd={(item) => withToast(`Added “${item.title}”`)}
+					onAdd={addOptimistically}
 				/>
 			{/each}
 		</div>
@@ -237,9 +247,9 @@
 							{item}
 							{signedIn}
 							priority={index < EAGER_POSTERS}
-							saved={data.saved[mediaKey(item)] ?? null}
+							saved={savedIndex[mediaKey(item)] ?? null}
 							onSelect={() => openTitle(item)}
-							onSubmit={withToast(`Added “${item.title}”`)}
+							onSubmit={addOptimistically(item)}
 						/>
 					{/each}
 				</PosterGrid>
@@ -271,9 +281,9 @@
 						{item}
 						{signedIn}
 						priority={index < EAGER_POSTERS}
-						saved={data.saved[mediaKey(item)] ?? null}
+						saved={savedIndex[mediaKey(item)] ?? null}
 						onSelect={() => openTitle(item)}
-						onSubmit={withToast(`Added “${item.title}”`)}
+						onSubmit={addOptimistically(item)}
 					/>
 				{/each}
 			</PosterGrid>
