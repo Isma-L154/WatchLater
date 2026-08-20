@@ -183,11 +183,17 @@
 
 	<div class="flex flex-1 flex-col gap-1 p-3">
 		{#if onSelect}
+			<!--
+				`py-2 -my-2` grows the hit area to the 44px a thumb needs without
+				moving the text a pixel. The poster above is the same action and a
+				much larger target, so this is the secondary route — but a 19px-tall
+				line was not a target at all.
+			-->
 			<button
 				type="button"
 				onclick={onSelect}
 				{title}
-				class="line-clamp-2 cursor-pointer text-left text-sm leading-snug font-semibold text-ink transition-colors duration-200 hover:text-brand-hi"
+				class="-my-3 line-clamp-2 cursor-pointer py-3 text-left text-sm leading-snug font-semibold text-ink transition-colors duration-200 hover:text-brand-hi"
 			>
 				{title}
 			</button>

@@ -77,7 +77,7 @@
 			value={primaryTarget}
 			title={primaryDescription}
 			aria-label={primaryDescription}
-			class="flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]
+			class="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]
 				{done
 				? 'bg-mint/15 text-mint hover:bg-mint/25'
 				: 'bg-brand text-white shadow-sm shadow-brand/30 hover:bg-brand-hi'}"

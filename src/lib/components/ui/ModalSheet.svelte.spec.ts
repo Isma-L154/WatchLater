@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRawSnippet } from 'svelte';
+import { createRawSnippet, tick } from 'svelte';
 import { render } from 'vitest-browser-svelte';
 import { page, userEvent } from 'vitest/browser';
 import ModalSheet from './ModalSheet.svelte';
@@ -129,5 +129,81 @@ describe('ModalSheet', () => {
 
 		expect(document.activeElement === outside).toBe(false);
 		outside.remove();
+	});
+});
+
+describe('ModalSheet drag-to-dismiss', () => {
+	/**
+	 * The sheet drew a grab handle long before it answered one. These pin the
+	 * behaviour that handle promises, and the three cases where the gesture must
+	 * deliberately do nothing.
+	 */
+	function dragBy(distance: number, pointerType = 'touch') {
+		const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+		const send = (type: string, y: number) =>
+			dialog.dispatchEvent(
+				new PointerEvent(type, { pointerType, clientX: 180, clientY: y, bubbles: true })
+			);
+
+		send('pointerdown', 40);
+		for (let step = 1; step <= 8; step++) send('pointermove', 40 + (distance * step) / 8);
+		send('pointerup', 40 + distance);
+		return dialog;
+	}
+
+	it('closes when pulled down past the threshold', async () => {
+		const { onClose } = open();
+		dragBy(220);
+		expect(onClose).toHaveBeenCalled();
+	});
+
+	it('springs back from a short pull instead of closing', async () => {
+		const { onClose } = open();
+		const dialog = dragBy(40);
+		expect(onClose).not.toHaveBeenCalled();
+		// Back at rest, not left hanging part-way down.
+		expect(dialog.style.transform).toBe('');
+	});
+
+	it('ignores a mouse drag, which would only break text selection', async () => {
+		const { onClose } = open();
+		dragBy(220, 'mouse');
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	it('lets a scrolled sheet keep scrolling rather than dismissing', async () => {
+		const { onClose, screen } = open();
+		const dialog = screen.container.querySelector('[role="dialog"]') as HTMLElement;
+		// A sheet read part-way down must not close when the reader flicks on.
+		Object.defineProperty(dialog, 'scrollTop', { value: 300, configurable: true });
+
+		dragBy(220);
+		expect(onClose).not.toHaveBeenCalled();
+	});
+
+	it('does not move the sheet when pulled upward', async () => {
+		const { onClose } = open();
+		const dialog = document.querySelector('[role="dialog"]') as HTMLElement;
+		const send = (type: string, y: number) =>
+			dialog.dispatchEvent(
+				new PointerEvent(type, { pointerType: 'touch', clientX: 180, clientY: y, bubbles: true })
+			);
+
+		/**
+		 * Asserted mid-gesture, on purpose.
+		 *
+		 * Releasing resets the offset either way, so checking after `pointerup`
+		 * proves nothing — a sheet that slid upward the whole time would still end
+		 * at rest and still not close. The bug only exists while the finger is
+		 * down.
+		 */
+		send('pointerdown', 200);
+		send('pointermove', 80);
+		await tick();
+
+		expect(dialog.style.transform).toBe('');
+
+		send('pointerup', 80);
+		expect(onClose).not.toHaveBeenCalled();
 	});
 });
