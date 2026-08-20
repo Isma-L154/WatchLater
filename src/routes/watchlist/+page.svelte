@@ -16,7 +16,10 @@
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
+	import { absorb, withToast } from '$lib/forms/feedback';
+	import { pendingSaves } from '$lib/stores/pending-saves.svelte';
 	import { applyWatchlistView, countByStatus, isInProgress } from '$lib/domain/watchlist';
+	import { mediaKey } from '$lib/domain/media';
 	import type { WatchlistItem } from '$lib/server/db/schema';
 	import type { MediaType, SavedEntry } from '$lib/types';
 	import type { PageData } from './$types';
@@ -49,7 +52,17 @@
 
 	let selected = $state<{ tmdbId: number; mediaType: MediaType } | null>(null);
 
-	const counts = $derived(countByStatus(data.items));
+	/**
+	 * The list, minus anything the detail sheet has just been asked to remove.
+	 *
+	 * Without this the sheet and the grid would disagree for as long as the
+	 * request takes: the sheet offering to save the title back while its card
+	 * still sat in the grid behind it. The tile leaves with the tap; if the
+	 * server refuses, the refreshed data puts it straight back.
+	 */
+	const items = $derived(data.items.filter((item) => !pendingSaves.removed(mediaKey(item))));
+
+	const counts = $derived(countByStatus(items));
 
 	/**
 	 * Shows that are started but unfinished, surfaced above the grid.
@@ -60,12 +73,12 @@
 	 */
 	const continueWatching = $derived(
 		statusTab === 'toWatch' && typeFilter === 'all' && listQuery.trim() === ''
-			? data.items.filter(isInProgress)
+			? items.filter(isInProgress)
 			: []
 	);
 
 	const visibleItems = $derived(
-		applyWatchlistView(data.items, {
+		applyWatchlistView(items, {
 			status: statusTab,
 			type: typeFilter,
 			sort: sortBy,
@@ -74,26 +87,29 @@
 	);
 
 	// "<tmdbId>:<mediaType>" -> saved row, so the modal renders the same controls
-	// as the card without issuing a second query.
+	// as the card without issuing a second query. Pending changes are laid over
+	// the top, which is what lets the sheet answer a tap before the server does —
+	// including saving a title reached from "more like this", which is not in the
+	// list at all and so cannot be covered by the filter above.
 	const savedEntries = $derived(
-		new Map<string, SavedEntry>(
-			data.items.map((item) => [
-				`${item.tmdbId}:${item.mediaType}`,
-				{
-					id: item.id,
-					watched: item.watched,
-					seasonsSeen: item.seasonsSeen,
-					episodesIntoSeason: item.episodesIntoSeason,
-					totalSeasons: item.totalSeasons,
-					airedSeasons: item.airedSeasons
-				}
-			])
+		pendingSaves.overlay(
+			Object.fromEntries(
+				items.map((item): [string, SavedEntry] => [
+					mediaKey(item),
+					{
+						id: item.id,
+						watched: item.watched,
+						seasonsSeen: item.seasonsSeen,
+						episodesIntoSeason: item.episodesIntoSeason,
+						totalSeasons: item.totalSeasons,
+						airedSeasons: item.airedSeasons
+					}
+				])
+			)
 		)
 	);
 
-	const selectedSaved = $derived(
-		selected ? (savedEntries.get(`${selected.tmdbId}:${selected.mediaType}`) ?? null) : null
-	);
+	const selectedSaved = $derived(selected ? (savedEntries[mediaKey(selected)] ?? null) : null);
 
 	/** True when the view is narrowed past its default landing state. */
 	const filtersActive = $derived(
@@ -104,19 +120,6 @@
 		statusTab = 'toWatch';
 		typeFilter = 'all';
 		listQuery = '';
-	}
-
-	/**
-	 * Progressive-enhancement helper: after the action completes it refreshes the
-	 * page data and shows a toast reflecting the outcome.
-	 */
-	function withToast(message: string, type: 'success' | 'info' = 'success'): SubmitFunction {
-		return () =>
-			async ({ result, update }) => {
-				await update();
-				if (result.type === 'success') toasts.add(message, type);
-				else if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
-			};
 	}
 
 	/**
@@ -131,16 +134,16 @@
 	function seasonProgressToast(item: Pick<WatchlistItem, 'title'>): SubmitFunction {
 		return () =>
 			async ({ result, update }) => {
-				await update();
-				if (result.type !== 'success') {
-					if (result.type !== 'redirect') toasts.add('Something went wrong', 'error');
-					return;
-				}
-				const payload = result.data as
-					{ seasonsSeen?: number; airedSeasons?: number; totalSeasons?: number | null } | undefined;
-				const seen = payload?.seasonsSeen ?? 0;
-				const aired = payload?.airedSeasons ?? 0;
-				const total = payload?.totalSeasons ?? aired;
+				const payload = (await absorb(result, update)) as {
+					seasonsSeen?: number;
+					airedSeasons?: number;
+					totalSeasons?: number | null;
+				} | null;
+				if (!payload) return;
+
+				const seen = payload.seasonsSeen ?? 0;
+				const aired = payload.airedSeasons ?? 0;
+				const total = payload.totalSeasons ?? aired;
 
 				if (aired && seen >= aired) {
 					toasts.add(
