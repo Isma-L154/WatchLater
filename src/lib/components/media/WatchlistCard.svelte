@@ -114,7 +114,7 @@
 				<input type="hidden" name="id" value={item.id} />
 				<button
 					type="submit"
-					class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-surface-hi text-xs font-semibold text-ink ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line active:scale-[0.98]"
+					class="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-surface-hi text-xs font-semibold text-ink ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line active:scale-[0.98]"
 				>
 					<Icon name="rotate" size={14} /> Restore
 				</button>
@@ -141,7 +141,7 @@
 					<input type="hidden" name="id" value={item.id} />
 					<button
 						type="submit"
-						class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]
+						class="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl px-2 text-xs font-semibold transition-colors duration-200 active:scale-[0.98]
 							{item.watched
 							? 'bg-surface-hi text-ink-muted ring-1 ring-line ring-inset hover:bg-line hover:text-ink'
 							: unreleased

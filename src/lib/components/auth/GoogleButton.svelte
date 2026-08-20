@@ -20,7 +20,7 @@
 	href={resolve('/auth/google')}
 	data-sveltekit-reload
 	class="inline-flex items-center justify-center gap-2.5 rounded-xl bg-white font-semibold text-slate-900 shadow-sm transition hover:bg-slate-200 focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 focus-visible:outline-none active:scale-[0.98]
-		{size === 'full' ? 'w-full px-5 py-3 text-sm' : 'px-3.5 py-2 text-xs sm:text-sm'}"
+		{size === 'full' ? 'w-full px-5 py-3 text-sm' : 'min-h-11 px-3.5 py-2 text-xs sm:text-sm'}"
 >
 	<!-- Google "G" mark, inlined so the button costs no extra network request. -->
 	<svg class="h-4 w-4 flex-shrink-0" viewBox="0 0 48 48" aria-hidden="true">

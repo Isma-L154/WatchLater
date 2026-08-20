@@ -213,7 +213,18 @@
 			     wrong question. -->
 			<PeopleRail people={search.people} onSelect={openPerson} />
 
+			<!--
+				The heading appears with the skeleton, not after the answer.
+
+				It used to wait for results, which meant typing produced a bare grid of
+				placeholders that said nothing about why they were there — and made the
+				e2e test race a network round-trip. The count still waits, because a
+				number is a claim and there is nothing to count yet.
+			-->
 			{#if search.loading && search.results.length === 0}
+				<div class="mb-3 flex items-baseline justify-between gap-3">
+					<h2 class="text-sm font-bold tracking-wide text-ink-muted uppercase">Search results</h2>
+				</div>
 				<PosterGridSkeleton />
 			{:else if search.results.length > 0}
 				<div class="mb-3 flex items-baseline justify-between gap-3">

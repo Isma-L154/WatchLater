@@ -24,6 +24,64 @@
 	let dialog = $state<HTMLElement | null>(null);
 
 	/**
+	 * Drag-to-dismiss.
+	 *
+	 * The sheet has always drawn a grab handle on phones — the affordance people
+	 * expect from a bottom sheet — and never answered it. A handle that says
+	 * "pull me" and does nothing is worse than no handle at all, so this is the
+	 * behaviour catching up with the promise.
+	 */
+
+	/** How far the sheet has been pulled down, in pixels. Zero when at rest. */
+	let dragOffset = $state(0);
+	/** Set while a finger is down and the gesture belongs to the sheet, not the scroller. */
+	let dragging = $state(false);
+	let dragStartY = 0;
+
+	/** Past this, letting go dismisses. Below it, the sheet springs back. */
+	const DISMISS_AFTER = 120;
+
+	/**
+	 * Only touch, and only from the top of the scroll.
+	 *
+	 * A mouse has the close button and the backdrop, so capturing its drags would
+	 * only break text selection. And a sheet whose content is scrolled down must
+	 * keep scrolling: starting a dismiss there would mean a flick to read more
+	 * closes the thing being read.
+	 */
+	function onPointerDown(event: PointerEvent) {
+		if (event.pointerType === 'mouse') return;
+		if (!dialog || dialog.scrollTop > 0) return;
+
+		dragging = true;
+		dragStartY = event.clientY;
+	}
+
+	function onPointerMove(event: PointerEvent) {
+		if (!dragging) return;
+
+		const delta = event.clientY - dragStartY;
+		if (delta <= 0) {
+			// Pulling up is the scroller's gesture, not ours.
+			dragOffset = 0;
+			return;
+		}
+
+		// Resistance past the threshold, so the sheet feels attached to something
+		// rather than tracking the finger forever.
+		dragOffset = delta > DISMISS_AFTER ? DISMISS_AFTER + (delta - DISMISS_AFTER) * 0.35 : delta;
+	}
+
+	function onPointerUp() {
+		if (!dragging) return;
+
+		const dismiss = dragOffset >= DISMISS_AFTER;
+		dragging = false;
+		dragOffset = 0;
+		if (dismiss) onClose();
+	}
+
+	/**
 	 * Open/close side effects: lock the background scroll and hand focus back to
 	 * whatever opened the sheet.
 	 *
@@ -99,16 +157,31 @@
 	<div
 		bind:this={dialog}
 		class="relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto overscroll-contain rounded-t-3xl bg-surface shadow-2xl ring-1 ring-line sm:rounded-3xl"
+		style:transform={dragOffset ? `translateY(${dragOffset}px)` : undefined}
+		style:transition={dragging ? 'none' : 'transform 220ms var(--ease-out-soft, ease-out)'}
 		transition:fly={{ y: 40, duration: 220, opacity: 1 }}
 		onclick={(event) => event.stopPropagation()}
+		onpointerdown={onPointerDown}
+		onpointermove={onPointerMove}
+		onpointerup={onPointerUp}
+		onpointercancel={onPointerUp}
 		role="dialog"
 		aria-modal="true"
 		aria-label={label}
 		tabindex="-1"
 	>
-		<!-- Grab handle: the bottom-sheet affordance people expect on a phone. -->
+		<!--
+			Grab handle: the bottom-sheet affordance people expect on a phone, and
+			since the drag above, one the sheet actually answers. Left
+			`pointer-events-none` on purpose — the whole sheet is the drag surface,
+			so the handle only has to say so.
+		-->
 		<div class="pointer-events-none absolute inset-x-0 top-2 z-10 flex justify-center sm:hidden">
-			<span class="h-1 w-10 rounded-full bg-white/25"></span>
+			<span
+				class="h-1 w-10 rounded-full transition-colors duration-150 {dragging
+					? 'bg-white/60'
+					: 'bg-white/25'}"
+			></span>
 		</div>
 
 		<button

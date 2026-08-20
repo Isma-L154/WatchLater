@@ -45,7 +45,7 @@
 			type="button"
 			onclick={search.clear}
 			aria-label="Clear search"
-			class="absolute top-1/2 right-2.5 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-ink-faint transition-colors duration-200 hover:bg-surface-hi hover:text-ink"
+			class="absolute top-1/2 right-1.5 flex h-11 w-11 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full text-ink-faint transition-colors duration-200 hover:bg-surface-hi hover:text-ink"
 		>
 			<Icon name="close" size={16} />
 		</button>

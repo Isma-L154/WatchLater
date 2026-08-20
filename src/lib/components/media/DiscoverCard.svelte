@@ -56,13 +56,13 @@
 			<a
 				href={resolve('/auth/google')}
 				data-sveltekit-reload
-				class="flex min-h-[38px] w-full items-center justify-center rounded-xl bg-surface-hi text-xs font-semibold text-ink-muted ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line hover:text-ink"
+				class="flex min-h-11 w-full items-center justify-center rounded-xl bg-surface-hi text-xs font-semibold text-ink-muted ring-1 ring-line transition-colors duration-200 ring-inset hover:bg-line hover:text-ink"
 			>
 				Sign in to save
 			</a>
 		{:else if saved}
 			<span
-				class="flex min-h-[38px] w-full items-center justify-center gap-1.5 rounded-xl bg-mint/12 text-xs font-semibold text-mint"
+				class="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl bg-mint/12 text-xs font-semibold text-mint"
 			>
 				<Icon name="check" size={14} stroke={2.5} /> In your list
 			</span>
@@ -77,7 +77,7 @@
 				<input type="hidden" name="voteAverage" value={item.voteAverage ?? ''} />
 				<button
 					type="submit"
-					class="flex min-h-[38px] w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-semibold text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-hi active:scale-[0.98]"
+					class="flex min-h-11 w-full cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-brand text-xs font-semibold text-white shadow-sm shadow-brand/30 transition-colors duration-200 hover:bg-brand-hi active:scale-[0.98]"
 				>
 					<Icon name="plus" size={14} stroke={2.5} /> Save
 				</button>

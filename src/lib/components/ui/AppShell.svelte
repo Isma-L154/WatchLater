@@ -84,7 +84,7 @@
 			<a
 				href={resolve('/')}
 				onclick={() => homeReset.request()}
-				class="flex flex-shrink-0 items-center gap-2 transition-opacity duration-200 hover:opacity-80"
+				class="flex min-h-11 flex-shrink-0 items-center gap-2 transition-opacity duration-200 hover:opacity-80"
 			>
 				<span
 					class="flex h-8 w-8 items-center justify-center rounded-xl bg-brand text-white shadow-lg shadow-brand/25"

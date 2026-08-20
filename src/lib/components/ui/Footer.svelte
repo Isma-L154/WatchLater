@@ -22,7 +22,7 @@
 				href="https://www.themoviedb.org"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="mt-0.5 flex-shrink-0 transition-opacity duration-200 hover:opacity-80"
+				class="-m-2.5 mt-0.5 flex flex-shrink-0 items-center p-2.5 transition-opacity duration-200 hover:opacity-80"
 			>
 				<img src={tmdbLogo} alt="The Movie Database" width="72" height="9" />
 			</a>
@@ -31,9 +31,19 @@
 			</p>
 		</div>
 
-		<nav aria-label="Legal" class="flex flex-shrink-0 items-center gap-4">
-			<a href={resolve('/terms')} class="transition-colors duration-200 hover:text-ink">Terms</a>
-			<a href={resolve('/privacy')} class="transition-colors duration-200 hover:text-ink">
+		<!--
+			`-my-2.5` with matching padding: the links keep their position and their
+			spacing, and gain the vertical hit area a thumb needs. A 16px-tall legal
+			link is a link you have to aim at.
+		-->
+		<nav aria-label="Legal" class="-my-2.5 flex flex-shrink-0 items-center gap-2">
+			<a href={resolve('/terms')} class="px-2 py-2.5 transition-colors duration-200 hover:text-ink">
+				Terms
+			</a>
+			<a
+				href={resolve('/privacy')}
+				class="px-2 py-2.5 transition-colors duration-200 hover:text-ink"
+			>
 				Privacy
 			</a>
 		</nav>
