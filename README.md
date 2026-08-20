@@ -1,9 +1,18 @@
-# 🎬 Nextsode
+<p align="center">
+  <img alt="Nextsode — never lose your place in a series" src="docs/brand/nextsode-banner.png" width="880" />
+</p>
 
-Search movies and TV shows, save them to a personal list, and keep
-track of where you are in a series. Mobile-first, and free to host.
+<p align="center">
+  <b>Search films and TV, save them, and never lose your place in a series.</b><br>
+  Progress tracked down to the episode you stopped on, streaming availability in your
+  country, and suggestions drawn from your own list.
+</p>
 
-**▶️ Live demo: [nextsode.ilsproj.workers.dev](https://nextsode.ilsproj.workers.dev)**
+<p align="center">
+  <a href="https://nextsode.ilsproj.workers.dev">Live demo</a> ·
+  <a href="https://github.com/Isma-L154/nextsode/issues">Report a bug</a> ·
+  <a href="#running-locally">Run it locally</a>
+</p>
 
 ---
 
@@ -71,6 +80,10 @@ OAuth client ID for a Web application and add one redirect URI per environment �
 
 Other scripts: `npm run lint`, `npm run check`, `npm run test:unit`,
 `npm run test:e2e`.
+
+`npm run brand` regenerates the README banner from `docs/brand/banner.html`. It
+is drawn rather than painted — same palette, typefaces and film mark as the app —
+so editing that file and re-running the script is how the image changes.
 
 `npm run gen` regenerates `worker-configuration.d.ts` from the bindings in
 `wrangler.jsonc`. Run it when you add or change a binding, and commit the
