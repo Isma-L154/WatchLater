@@ -8,6 +8,42 @@
 	}
 
 	let { search, placeholder = 'Search movies and TV shows…' }: Props = $props();
+
+	let input = $state<HTMLInputElement | null>(null);
+
+	/** Somewhere a slash is a character rather than a command. */
+	function isTyping(element: Element | null): boolean {
+		if (!(element instanceof HTMLElement)) return false;
+		if (element.isContentEditable) return true;
+		return ['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName);
+	}
+
+	/**
+	 * `/` and ⌘K focus the search box from anywhere on the page.
+	 *
+	 * Search is the primary action here and reaching it otherwise costs a scroll
+	 * back to the top. Two guards keep the shortcut from being a nuisance: it
+	 * never fires while something editable has focus — a slash typed into a field
+	 * is a slash — and it stays out of the way while a sheet is open, where the
+	 * dialog owns the keyboard and its own focus trap.
+	 */
+	$effect(() => {
+		const onKey = (event: KeyboardEvent) => {
+			const wantsSearch =
+				event.key === '/' || ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k');
+			if (!wantsSearch) return;
+			if (isTyping(document.activeElement)) return;
+			if (document.querySelector('[role="dialog"]')) return;
+
+			event.preventDefault();
+			input?.focus();
+			// Selected, so typing replaces the old query instead of appending to it.
+			input?.select();
+		};
+
+		window.addEventListener('keydown', onKey);
+		return () => window.removeEventListener('keydown', onKey);
+	});
 </script>
 
 <label class="relative block">
@@ -31,6 +67,7 @@
 		page on focus and never zooms back out.
 	-->
 	<input
+		bind:this={input}
 		type="search"
 		bind:value={search.query}
 		oninput={search.onInput}
@@ -39,6 +76,25 @@
 		enterkeyhint="search"
 		class="w-full rounded-2xl border border-line bg-surface py-3.5 pr-12 pl-11 text-base text-ink shadow-inner shadow-black/20 transition-colors duration-200 placeholder:text-ink-faint focus:border-brand focus:bg-surface-hi"
 	/>
+
+	<!--
+		A shortcut nobody knows about helps nobody. The hint sits where the clear
+		button will go, and yields to it the moment there is something to clear.
+
+		Shown by a media query rather than by `matchMedia` in an effect: the check
+		is about the input device, which never changes mid-session, and doing it in
+		JavaScript means the hint is absent from the server's HTML and pops in after
+		hydration. `(pointer: fine)` is the honest test — not a width, since a
+		tablet is wide and still has no key to press.
+	-->
+	{#if !search.active}
+		<span
+			aria-hidden="true"
+			class="pointer-events-none absolute top-1/2 right-3.5 hidden -translate-y-1/2 rounded-md bg-surface-hi px-2 py-1 font-mono text-[11px] leading-none text-ink-faint ring-1 ring-line [@media(hover:hover)_and_(pointer:fine)]:block"
+		>
+			/
+		</span>
+	{/if}
 
 	{#if search.active}
 		<button
