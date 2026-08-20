@@ -2,14 +2,22 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import Seo from '$lib/components/Seo.svelte';
+	import { pageSchema } from '$lib/format/seo';
 	import Prose from '$lib/components/ui/Prose.svelte';
+
+	// Declared once: the meta tags and the structured data have to agree, and
+	// two copies of a sentence are two chances for them to drift apart.
+	const TITLE = 'Terms of Use — Nextsode';
+	const DESCRIPTION =
+		'The terms that apply to using Nextsode: a free, personal watchlist for films and TV shows.';
 </script>
 
 <Seo
-	title="Terms of Use — Nextsode"
-	description="The terms that apply to using Nextsode: a free, personal watchlist for films and TV shows."
+	title={TITLE}
+	description={DESCRIPTION}
 	origin={page.data.origin}
 	path="/terms"
+	schema={pageSchema(page.data.origin, '/terms', TITLE, DESCRIPTION)}
 />
 
 <Prose title="Terms of Use" updated="15 August 2026">

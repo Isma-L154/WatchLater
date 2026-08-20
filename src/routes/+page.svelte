@@ -16,6 +16,7 @@
 	import PersonSheet from '$lib/components/media/PersonSheet.svelte';
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import Seo from '$lib/components/Seo.svelte';
+	import { siteSchema } from '$lib/format/seo';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { homeReset } from '$lib/stores/home-reset.svelte';
 	import { TrendingFeed } from '$lib/stores/trending.svelte';
@@ -155,22 +156,22 @@
 	description="A free watchlist for films and TV. Track series down to the episode you are on, see where to watch anything, and never mark a season watched before it has aired."
 	origin={page.data.origin}
 	path="/"
-	schema={{
-		'@context': 'https://schema.org',
-		'@type': 'WebApplication',
-		name: 'Nextsode',
-		url: page.data.origin,
-		applicationCategory: 'EntertainmentApplication',
-		operatingSystem: 'Any',
-		description:
-			'A free watchlist for films and TV shows, with episode-level progress tracking and streaming availability.',
-		offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
-	}}
+	schema={siteSchema(page.data.origin)}
 />
 
 <div class="py-5 sm:py-8">
-	<h1 class="font-display text-2xl font-extrabold sm:text-3xl">Discover</h1>
-	<p class="mt-1 text-sm text-ink-muted">Find something worth your evening.</p>
+	<!--
+		The heading names the product, not just the section.
+
+		"Discover" alone was a good label and a wasted signal: it is the page's one
+		`h1` and it said neither what this is nor what it is for. The subtitle picks
+		up the words somebody would actually use — watchlist, episode — without
+		turning into a list of them.
+	-->
+	<h1 class="font-display text-2xl font-extrabold sm:text-3xl">Discover films and TV</h1>
+	<p class="mt-1 text-sm text-ink-muted">
+		Find something worth your evening — and keep your watchlist honest, down to the episode.
+	</p>
 
 	<div class="mt-5">
 		<SearchBar {search} />
