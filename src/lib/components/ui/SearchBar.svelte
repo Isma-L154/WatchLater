@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Icon from './Icon.svelte';
 	import type { MediaSearch } from '$lib/stores/search.svelte';
 
@@ -10,6 +11,24 @@
 	let { search, placeholder = 'Search movies and TV shows…' }: Props = $props();
 
 	let input = $state<HTMLInputElement | null>(null);
+
+	/**
+	 * Search for whatever the box already held when the page came alive.
+	 *
+	 * The box is real HTML from the server, so it is focusable and typeable the
+	 * moment it paints — which on a slow connection is seconds before the script
+	 * that makes it *search* has arrived. Svelte's binding does adopt the text
+	 * that was typed, but nothing ever fired `oninput`, so no request was
+	 * scheduled for it: the page switches to the results view and reports "no
+	 * results" for a search it never ran. A wrong answer, rather than a slow one.
+	 *
+	 * `onMount` and not setup, because a write during hydration lands in the
+	 * state without re-rendering markup already reconciled against the server's
+	 * HTML.
+	 */
+	onMount(() => {
+		if (search.query) search.onInput();
+	});
 
 	/** Somewhere a slash is a character rather than a command. */
 	function isTyping(element: Element | null): boolean {
