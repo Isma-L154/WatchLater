@@ -20,10 +20,12 @@ import type { Actions, PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ locals }) => {
 	// Typed rather than a bare `[]`: an untyped empty array widens the union the
 	// page sees to `never[]`, which breaks inference on every helper downstream.
-	if (!locals.user) return { items: [] as WatchlistRow[], autoArchiveDays: null };
+	if (!locals.user) {
+		return { items: [] as WatchlistRow[], autoArchiveDays: null, calendarToken: null };
+	}
 
 	const [row] = await getDb()
-		.select({ autoArchiveDays: user.autoArchiveDays })
+		.select({ autoArchiveDays: user.autoArchiveDays, calendarToken: user.calendarToken })
 		.from(user)
 		.where(eq(user.id, locals.user.id))
 		.limit(1);
@@ -41,7 +43,13 @@ export const load: PageServerLoad = async ({ locals }) => {
 		autoArchiveDays
 	);
 
-	return { items, autoArchiveDays };
+	/**
+	 * The feed token reaches the browser deliberately: it is what the URL on
+	 * screen is made of, and that URL has to be copyable onto a second device.
+	 * It is only ever sent to its own owner — this loader returns nothing at all
+	 * without a session.
+	 */
+	return { items, autoArchiveDays, calendarToken: row?.calendarToken ?? null };
 };
 
 export const actions: Actions = watchlistActions;

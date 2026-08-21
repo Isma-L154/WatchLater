@@ -31,6 +31,22 @@ export const user = sqliteTable('user', {
 	 */
 	autoArchiveDays: integer('auto_archive_days'),
 
+	/**
+	 * Secret that makes the calendar feed readable, or null when there is none.
+	 *
+	 * Opt-in: no token exists until somebody asks for one, and regenerating
+	 * replaces it, which is what breaks every subscription made with the old URL.
+	 *
+	 * Stored as-is rather than hashed, unlike `session.id`, and the difference is
+	 * deliberate. A session token is an authentication credential the browser
+	 * already holds a copy of, so the database never needs to reproduce it. A
+	 * feed URL has to be shown again — on the second device, a year later — and a
+	 * hash cannot be shown. The trade is that a database leak exposes feed URLs;
+	 * the mitigations are that the URL grants read-only access to one list and
+	 * that it can be revoked from the UI.
+	 */
+	calendarToken: text('calendar_token').unique(),
+
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.notNull()
 		.$defaultFn(() => new Date())

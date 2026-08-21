@@ -43,6 +43,13 @@
       "when": 1786760754883,
       "tag": "0005_chilly_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1787271561381,
+      "tag": "0006_nappy_zaladane",
+      "breakpoints": true
     }
   ]
 }

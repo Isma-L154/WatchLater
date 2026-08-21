@@ -13,6 +13,7 @@
 	import ContinueWatching from '$lib/components/media/ContinueWatching.svelte';
 	import ComingSoon from '$lib/components/media/ComingSoon.svelte';
 	import AutoArchiveControl from '$lib/components/media/AutoArchiveControl.svelte';
+	import CalendarFeed from '$lib/components/media/CalendarFeed.svelte';
 	import MediaDetailModal from '$lib/components/media/MediaDetailModal.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { toasts } from '$lib/stores/toasts.svelte';
@@ -265,6 +266,11 @@
 			{/if}
 
 			{#if statusTab === 'upcoming'}
+				<!-- Offered here rather than in a settings screen: this is the tab
+				     about when things happen, which is the only place subscribing a
+				     calendar to the list means anything. -->
+				<CalendarFeed token={data.calendarToken} origin={page.data.origin} />
+
 				<!-- The one tab where the date *is* the content, so it groups by how
 				     soon rather than laying everything out in one undifferentiated grid. -->
 				<ComingSoon

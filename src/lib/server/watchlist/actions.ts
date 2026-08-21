@@ -13,6 +13,7 @@ import { resolveEpisodeTarget, seasonBoundary } from '$lib/domain/episodes';
 import { normalizeArchiveWindow } from '$lib/domain/archive';
 import { resolveSeasonInfo, safeDetails, seasonInfoForSave } from './seasons';
 import { watchedStamp } from './stamp';
+import { issueCalendarToken, revokeCalendarToken } from '../calendar';
 import type { MediaType } from '$lib/types';
 
 /**
@@ -102,6 +103,28 @@ export const watchlistActions = {
 			.onConflictDoNothing();
 
 		return { added: true };
+	},
+
+	/**
+	 * Turn the calendar feed on, or roll it over.
+	 *
+	 * One action for both, because they are the same operation: a new token
+	 * replaces whatever was there. Rolling over is how somebody takes back a URL
+	 * that ended up somewhere it should not have, and it necessarily breaks every
+	 * subscription made with the old one — which is the point, and which the UI
+	 * says out loud before doing it.
+	 */
+	issueCalendarFeed: async ({ locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+		await issueCalendarToken(locals.user.id);
+		return { calendar: 'issued' as const };
+	},
+
+	/** Turn the calendar feed off, invalidating every subscription to it. */
+	revokeCalendarFeed: async ({ locals }) => {
+		if (!locals.user) return fail(401, UNAUTHENTICATED);
+		await revokeCalendarToken(locals.user.id);
+		return { calendar: 'revoked' as const };
 	},
 
 	/** Remove an item from the list. */

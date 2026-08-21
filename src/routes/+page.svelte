@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { page } from '$app/state';
-	import { replaceState } from '$app/navigation';
+	import { afterNavigate, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { SubmitFunction } from '@sveltejs/kit';
 	import Icon from '$lib/components/ui/Icon.svelte';
@@ -17,6 +17,7 @@
 	import GoogleButton from '$lib/components/auth/GoogleButton.svelte';
 	import Seo from '$lib/components/Seo.svelte';
 	import { siteSchema } from '$lib/format/seo';
+	import { parseTitleParam } from '$lib/domain/calendar';
 	import { MediaSearch } from '$lib/stores/search.svelte';
 	import { homeReset } from '$lib/stores/home-reset.svelte';
 	import { JUST_SAVED, optimistic, pendingSaves } from '$lib/stores/pending-saves.svelte';
@@ -130,17 +131,34 @@
 	const selectedSaved = $derived(selected ? (savedIndex[mediaKey(selected)] ?? null) : null);
 
 	/**
-	 * Surface the outcome of the OAuth round-trip, which comes back as a query
-	 * parameter, then strip it so a refresh doesn't replay the message.
+	 * The two query parameters that describe an *arrival* rather than a state:
+	 * where a calendar event pointed, and how the OAuth round-trip went. Both are
+	 * acted on once and then stripped, so a refresh or a back button does not
+	 * replay them.
+	 *
+	 * `afterNavigate` rather than `$effect`, and the `await` is not decoration.
+	 * `replaceState` throws until SvelteKit's client router has started, and on a
+	 * first load neither an effect nor this callback is late enough — which was
+	 * already happening to anyone who failed to sign in and landed on
+	 * `?auth=error`: a page error instead of the message, and the parameter left
+	 * in the bar. Acting comes first and tidying up waits, so the slow half
+	 * cannot delay the sheet opening.
+	 *
+	 * Shallow routing does not re-trigger this, so stripping cannot loop.
 	 */
-	$effect(() => {
+	afterNavigate(async () => {
+		const title = parseTitleParam(page.url.searchParams.get('title'));
 		const outcome = page.url.searchParams.get('auth');
-		if (!outcome) return;
+		if (!title && !outcome) return;
 
+		const { pathname } = page.url;
+
+		if (title) openTitle(title);
 		if (outcome === 'error') toasts.add('Could not sign you in. Please try again.', 'error');
 		else if (outcome === 'unavailable') toasts.add('Sign-in is not configured yet.', 'error');
 
-		replaceState(page.url.pathname, page.state);
+		await tick();
+		replaceState(pathname, page.state);
 	});
 
 	/**

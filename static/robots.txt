@@ -7,5 +7,7 @@ Disallow: /api/
 Disallow: /auth/
 # A private list signed in, a sign-in prompt signed out. Neither is a result.
 Disallow: /watchlist
+# One person's calendar feed, reachable only by a secret nobody should publish.
+Disallow: /calendar/
 
 Sitemap: https://nextsode.ilsproj.workers.dev/sitemap.xml
