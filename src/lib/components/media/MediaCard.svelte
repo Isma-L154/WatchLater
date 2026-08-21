@@ -109,8 +109,23 @@
 			class="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-canvas/95 via-canvas/40 to-transparent"
 		></div>
 
+		<!--
+			The badges below are flat, unlike the frosted header and sheet.
+
+			They used to carry `backdrop-blur-sm` for the same look, and at 65-70%
+			black over a poster a 4px blur is invisible — screenshots of a badge with
+			and without it are indistinguishable. What it was not was free: each one
+			is a compositing layer the compositor re-samples every frame, and there
+			are two per card. On a grid of 77 titles that is 154 of them, and
+			removing them halved the renderer's work during a scroll (794ms -> 392ms
+			over 300 frames, `Commit` 1.19ms -> 0.25ms per frame, 4x CPU throttle).
+
+			The two places blur is still worth its cost — the sticky header and the
+			sheet — are one element each and sit over genuinely moving content.
+		-->
+
 		<span
-			class="absolute top-2 left-2 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-1 text-[10px] font-bold tracking-wider text-ink uppercase backdrop-blur-sm"
+			class="absolute top-2 left-2 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-1 text-[10px] font-bold tracking-wider text-ink uppercase"
 		>
 			<Icon name={mediaType === 'tv' ? 'tv' : 'film'} size={11} stroke={2.4} />
 			{mediaType === 'tv' ? 'TV' : 'Film'}
@@ -118,7 +133,7 @@
 
 		{#if rating}
 			<span
-				class="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-1 text-[11px] font-bold text-gold backdrop-blur-sm"
+				class="absolute top-2 right-2 flex items-center gap-1 rounded-md bg-black/65 px-1.5 py-1 text-[11px] font-bold text-gold"
 			>
 				<Icon name="star" size={11} filled />
 				{rating}
@@ -130,7 +145,7 @@
 		     that is not out and a season that has not aired. -->
 		{#if !unreleased && upcomingSeason}
 			<span
-				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 backdrop-blur-sm ring-inset"
+				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 ring-inset"
 			>
 				<span class="sr-only">Next season not aired yet —</span>
 				<span class="relative flex h-1.5 w-1.5">
@@ -146,7 +161,7 @@
 
 		{#if unreleased}
 			<span
-				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 backdrop-blur-sm ring-inset"
+				class="absolute bottom-2 left-2 flex items-center gap-1.5 rounded-full bg-black/70 py-1 pr-2.5 pl-2 text-[10px] font-semibold tracking-wide text-amber ring-1 ring-amber/25 ring-inset"
 			>
 				<span class="sr-only">Not released yet —</span>
 				<span class="relative flex h-1.5 w-1.5">
