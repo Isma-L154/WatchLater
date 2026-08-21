@@ -8,6 +8,7 @@
 	import EpisodePicker from './EpisodePicker.svelte';
 	import WatchProviders from './WatchProviders.svelte';
 	import SaveControl from './SaveControl.svelte';
+	import AddToCalendar from './AddToCalendar.svelte';
 	import CastRow from './CastRow.svelte';
 	import { getEpisodePosition } from '$lib/domain/episodes';
 	import { MediaDetailsRequest } from '$lib/stores/details.svelte';
@@ -104,6 +105,9 @@
 		<div class="relative -mt-14 px-4 pb-8 sm:px-6">
 			<DetailHeading {details} />
 			<ReleaseBanner {details} />
+			<!-- Directly under the banner that says it is not out yet: that is the
+			     sentence this answers. -->
+			<AddToCalendar {details} />
 
 			{#if saved && details.mediaType === 'tv' && details.airedSeasons && details.airedSeasons > 1}
 				<SeasonPicker
