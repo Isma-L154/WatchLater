@@ -110,8 +110,17 @@
 	 * Trending pagination is deliberately not reset. Pressing the logo to get
 	 * home should not throw away pages somebody asked for by hand.
 	 */
+	let lastReset = untrack(() => homeReset.requested);
+
 	$effect(() => {
-		void homeReset.requested;
+		const requested = homeReset.requested;
+		// Only a *change* is a press. Running on mount as well used to be a
+		// harmless no-op, because the search was always empty by then — until the
+		// box started adopting text typed before the page came alive, which this
+		// then wiped a moment after rescuing it.
+		if (requested === lastReset) return;
+		lastReset = requested;
+
 		untrack(() => {
 			search.clear();
 			selected = null;
