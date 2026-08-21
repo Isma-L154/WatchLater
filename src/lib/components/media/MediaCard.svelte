@@ -184,18 +184,26 @@
 	<div class="flex flex-1 flex-col gap-1 p-3">
 		{#if onSelect}
 			<!--
-				`py-2 -my-2` grows the hit area to the 44px a thumb needs without
+				`py-3 -my-3` grows the hit area to the 44px a thumb needs without
 				moving the text a pixel. The poster above is the same action and a
 				much larger target, so this is the secondary route — but a 19px-tall
 				line was not a target at all.
+
+				The clamp belongs to the span, not to the button, and the two reasons
+				are separate. `-webkit-line-clamp` needs a `-webkit-box`, which a
+				`<button>` refuses to become — it blockifies to `flow-root`, leaving
+				the clamp inert. And `overflow: hidden` clips at the *padding* box, so
+				with padding on the same element a third line still paints inside it —
+				straight over the year underneath, which the negative margin has pulled
+				up to meet it. A padding-free element clips where its text ends.
 			-->
 			<button
 				type="button"
 				onclick={onSelect}
 				{title}
-				class="-my-3 line-clamp-2 cursor-pointer py-3 text-left text-sm leading-snug font-semibold text-ink transition-colors duration-200 hover:text-brand-hi"
+				class="-my-3 block cursor-pointer py-3 text-left text-sm leading-snug font-semibold text-ink transition-colors duration-200 hover:text-brand-hi"
 			>
-				{title}
+				<span class="line-clamp-2">{title}</span>
 			</button>
 		{:else}
 			<h3 class="line-clamp-2 text-sm leading-snug font-semibold text-ink" {title}>{title}</h3>
