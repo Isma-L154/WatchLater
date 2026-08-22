@@ -29,9 +29,12 @@
 	 * can spend a shared, rate-limited TMDB quota on everybody else's behalf, and
 	 * the reason a CAPTCHA on the sign-in button would have protected nothing.
 	 *
-	 * The dashboard's rate limiting rules are not an option here: those apply to
-	 * zones, and this runs on a workers.dev subdomain. This binding runs inside
-	 * the Worker instead, and adds no cost beyond the request itself.
+	 * This binding runs inside the Worker and adds no cost beyond the request
+	 * itself. It predates the move to a custom domain, when the app sat on a
+	 * workers.dev subdomain and the dashboard's zone-level rules were therefore
+	 * unavailable. They are available now — but a zone rule is configuration held
+	 * somewhere this repository cannot see, and this one is in the file, reviewed
+	 * with the code and deployed with it. Kept for that reason, not by inertia.
 	 *
 	 * Cloudflare describes it as approximate rather than exact, which is the right
 	 * trade for the job: the goal is to stop a script draining the quota, not to
@@ -44,6 +47,27 @@
 			"simple": { "limit": 60, "period": 60 }
 		}
 	],
+	/**
+	 * The public address.
+	 *
+	 * Declared here rather than left in the dashboard so the deployment target is
+	 * reviewed with the code that answers on it. Cloudflare owns the DNS record
+	 * and the certificate for a custom domain; there is nothing to keep in sync
+	 * by hand.
+	 */
+	"routes": [{ "pattern": "nextsode.cloudils.com", "custom_domain": true }],
+
+	/**
+	 * The workers.dev subdomain stays on, and redirects.
+	 *
+	 * Not because two hosts should serve the same pages — they should not, and a
+	 * second live copy would compete with this one in search. It stays because a
+	 * host that is switched off cannot redirect: the page Google had indexed would
+	 * 404 and be dropped, along with every existing link and bookmark. The Worker
+	 * answers the old hostname with a 301 and nothing else; see `hooks.server.ts`.
+	 *
+	 * Turn this off once the old address stops receiving traffic.
+	 */
 	"workers_dev": true,
 	"preview_urls": true
 }
