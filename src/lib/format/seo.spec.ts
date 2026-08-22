@@ -56,8 +56,8 @@ describe('siteSchema', () => {
 	});
 
 	it('names the site, which is what a result gets titled with', () => {
-		// Without this Google infers a name from the domain, and the domain says
-		// "ilsproj" rather than anything resembling the product.
+		// Without this Google infers a name from the domain or the title, which is
+		// a guess about the product rather than a statement of it.
 		expect(node('WebSite').name).toBe('Nextsode');
 	});
 

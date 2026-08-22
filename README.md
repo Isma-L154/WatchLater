@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://nextsode.ilsproj.workers.dev">Live demo</a> ·
+  <a href="https://nextsode.cloudils.com">Live demo</a> ·
   <a href="https://github.com/Isma-L154/nextsode/issues">Report a bug</a> ·
   <a href="#running-locally">Run it locally</a>
 </p>

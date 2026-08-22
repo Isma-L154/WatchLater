@@ -48,9 +48,11 @@ const appId = (origin: string) => `${origin}/#app`;
  * The site as one entity, described once.
  *
  * Two nodes rather than one, because they answer different questions. Google
- * reads `WebSite.name` to decide what to *call* this site in a result — without
- * it the name is inferred from the title or the domain, and this domain says
- * `ilsproj`. `WebApplication` is what the site *is*.
+ * reads `WebSite.name` to decide what to *call* this site in a result; without
+ * it the name is inferred from the title or the domain. That used to matter
+ * urgently, when the domain read `ilsproj` and named nothing — it matters less
+ * on a domain of our own, and stating the name outright is still better than
+ * leaving it to be guessed. `WebApplication` is what the site *is*.
  *
  * `sameAs` is the part that matters most here and the part that is easiest to
  * mistake for decoration. "Nextsode" is an invented word one letter away from
