@@ -8,6 +8,51 @@ import {
 } from '$lib/server/auth';
 
 /**
+ * The host this site answers on. Everything else is history or a preview.
+ */
+const CANONICAL_HOST = 'nextsode.cloudils.com';
+
+/**
+ * The address this site used to live at, before it had a domain of its own.
+ */
+const RETIRED_HOST = 'nextsode.ilsproj.workers.dev';
+
+/**
+ * Send the old address to the new one.
+ *
+ * Two hostnames written out by hand, which is deliberate and not the same
+ * mistake `robots.txt` used to make. That file named a host it should have
+ * derived from the request; this is a fixed mapping between one specific old
+ * address and one specific new one — a fact about a migration, not a value that
+ * can silently go stale. It can be deleted outright once nothing arrives here.
+ *
+ * Matched on the exact hostname rather than on `.workers.dev`, because preview
+ * deployments are served from versioned subdomains of it. A broader test would
+ * bounce every preview to production and quietly make previews useless.
+ *
+ * `GET` and `HEAD` get a 301: that is the code search engines act on, and the
+ * point is for the old URL's standing to move rather than be thrown away.
+ * Anything else gets a 308, which preserves the method — someone with the old
+ * page still open and a form to submit would otherwise have their POST turned
+ * into a GET and their save silently dropped.
+ */
+export const redirectRetiredHost: Handle = async ({ event, resolve }) => {
+	if (event.url.hostname !== RETIRED_HOST) return resolve(event);
+
+	const target = new URL(event.url);
+	target.hostname = CANONICAL_HOST;
+	target.protocol = 'https:';
+	target.port = '';
+
+	const safeMethod = event.request.method === 'GET' || event.request.method === 'HEAD';
+
+	return new Response(null, {
+		status: safeMethod ? 301 : 308,
+		headers: { location: target.toString() }
+	});
+};
+
+/**
  * Resolve the session cookie once per request and expose the result on
  * `event.locals`, so every load function and action can trust `locals.user`
  * without repeating the lookup.
@@ -93,4 +138,6 @@ const securityHeaders: Handle = async ({ event, resolve }) => {
 	return response;
 };
 
-export const handle = sequence(securityHeaders, authenticate);
+// The redirect runs first: a request to the old host has no business reaching
+// the database, and the response it gets carries no body to protect.
+export const handle = sequence(redirectRetiredHost, securityHeaders, authenticate);

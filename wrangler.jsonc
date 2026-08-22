@@ -58,14 +58,16 @@
 	"routes": [{ "pattern": "nextsode.cloudils.com", "custom_domain": true }],
 
 	/**
-	 * The workers.dev subdomain is off.
+	 * The workers.dev subdomain stays on, and redirects.
 	 *
-	 * Two hosts serving the same pages is two sites competing in search, and the
-	 * old one was on the Public Suffix List, which capped what it could ever be
-	 * worth. Turning it off rather than redirecting means the page Google had
-	 * indexed will 404 and be dropped — a deliberate clean start, not an
-	 * oversight. Setting this back to `true` is all it takes to undo.
+	 * Not because two hosts should serve the same pages — they should not, and a
+	 * second live copy would compete with this one in search. It stays because a
+	 * host that is switched off cannot redirect: the page Google had indexed would
+	 * 404 and be dropped, along with every existing link and bookmark. The Worker
+	 * answers the old hostname with a 301 and nothing else; see `hooks.server.ts`.
+	 *
+	 * Turn this off once the old address stops receiving traffic.
 	 */
-	"workers_dev": false,
+	"workers_dev": true,
 	"preview_urls": true
 }
